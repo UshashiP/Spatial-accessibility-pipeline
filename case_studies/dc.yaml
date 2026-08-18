@@ -1,0 +1,87 @@
+# Washington DC — FOSS4G showcase case study
+# Facility: CMS Intermediate Care Facilities (ICF/IID)
+# Blocks:   2020 Census blocks with sociodemographic enrichment
+# CRS:      EPSG:26985 (DC State Plane NAD83, metres)
+#
+# Run:
+#   python run_pipeline.py --config case_studies/dc.yaml
+
+study_area:
+  name: "Washington DC"
+  state_fips: "11"
+  state_abbrev: "DC"
+  bbox: [-77.1198, 38.7916, -76.9094, 38.9955]
+  coordinate_system: "EPSG:26985"
+  distance_unit: "meters"
+
+facility:
+  type: "ICF"
+  label: "Intermediate Care Facilities"
+  cms_dataset_id: "78j2-v3zx"
+  cms_category_code: "13"
+  supply_column: "CRTFD_BED_CNT"
+  supply_label: "Certified beds"
+
+census:
+  base_url: "https://api.census.gov/data"
+  year: 2020
+  dataset: "dec/pl"
+  variables:
+    total_population: "P1_001N"
+  geography: "block"
+
+cms:
+  base_url: "https://data.cms.gov/provider-data/api/1/datastore/query"
+
+analysis:
+  distance_threshold_m: 900
+  decay_function: "gaussian"
+  population_column: "population"
+  method_label: "Enhanced 2SFCA"
+
+s3:
+  prefix: "healthcare-accessibility"
+  bronze: "bronze"
+  silver: "silver"
+  gold: "gold"
+  region: "us-east-1"
+  geoparquet_compression: "snappy"
+
+duckdb:
+  db_path: "outputs/results/dc_icf_accessibility.duckdb"
+  gold_table: "accessibility_scores"
+
+data:
+  snapshot:
+    use_snapshot: true
+  local_shapefiles:
+    facilities: "data/intermediate_files/ICFs_DC.shp"
+    census_blocks: "data/intermediate_files/blocksandtract_economic_final.shp"
+  population_column: "Total Popu"
+  intermediate:
+    path: "data/intermediate_files/"
+  output:
+    results: "outputs/results/"
+    figures: "outputs/figures/"
+
+validation:
+  min_population: 0
+  max_population: 50000
+  min_supply: 1
+  max_supply: 1000
+  required_facility_columns: ["geometry", "supply"]
+  required_population_columns: ["geometry", "population"]
+  max_null_pct: 0.05
+
+visualization:
+  figure_dpi: 300
+  figure_size: [12, 10]
+  colormap: "RdYlBu"
+  save_format: "png"
+  vmax_percentile: 95
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/dc_pipeline.log"
+  console_output: true

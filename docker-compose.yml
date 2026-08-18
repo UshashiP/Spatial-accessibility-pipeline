@@ -1,0 +1,266 @@
+# Docker Compose for Healthcare Accessibility Analysis
+# Full stack: PostgreSQL + PostGIS + Python Pipeline + FastAPI (future)
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # PostgreSQL + PostGIS Database
+  # ============================================================================
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: accessibility_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env file}
+      POSTGRES_DB: healthcare_accessibility
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+      # PostGIS auto-initialization
+      POSTGIS_GDAL_ENABLED_DRIVERS: "ENABLE_ALL"
+      POSTGIS_ENABLE_OUTDB_RASTERS: 1
+    ports:
+      - "5432:5432"
+    volumes:
+      # Persistent data storage
+      - postgres_data:/var/lib/postgresql/data
+      # Backup location
+      - ./backups:/backups
+    networks:
+      - accessibility_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d healthcare_accessibility"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    # Performance tuning
+    command: >
+      postgres
+      -c shared_buffers=2GB
+      -c effective_cache_size=6GB
+      -c work_mem=64MB
+      -c maintenance_work_mem=512MB
+      -c max_locks_per_transaction=256
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c max_connections=200
+
+  # ============================================================================
+  # Python Analysis Pipeline
+  # ============================================================================
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: accessibility_pipeline
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database connection
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: healthcare_accessibility
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env file}
+      # Application config
+      CONFIG_PATH: /app/config.yaml
+      LOG_LEVEL: INFO
+      # Python environment
+      PYTHONUNBUFFERED: 1
+    volumes:
+      # Mount data directory (read-only in production)
+      - ./data:/app/data:ro
+      # Mount outputs (writable)
+      - ./outputs:/app/outputs:rw
+      # Mount logs
+      - ./logs:/app/logs:rw
+      # Config hot-reload for development
+      - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - accessibility_network
+    # Override default CMD for on-demand execution
+    profiles:
+      - manual
+    # For scheduled runs, use cron or external orchestrator
+
+  # ============================================================================
+  # FastAPI REST API (Future Implementation)
+  # ============================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: accessibility_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: healthcare_accessibility
+      DB_USER: api_reader  # Read-only role
+      DB_PASSWORD: ${API_DB_PASSWORD:?Set API_DB_PASSWORD in .env file}
+      API_TITLE: "Healthcare Accessibility API"
+      API_VERSION: "1.0.0"
+      CORS_ORIGINS: "*"
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs:rw
+    networks:
+      - accessibility_network
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 4
+      --log-level info
+      --access-log
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    profiles:
+      - api
+
+  # ============================================================================
+  # pgAdmin (Optional: Database Management UI)
+  # ============================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: accessibility_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@accessibility.local
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?Set PGADMIN_PASSWORD in .env file}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docs:/docs:ro
+    networks:
+      - accessibility_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - admin
+
+  # ============================================================================
+  # Jupyter Notebook (Optional: Interactive Analysis)
+  # ============================================================================
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: application
+    container_name: accessibility_jupyter
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: healthcare_accessibility
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env file}
+      JUPYTER_ENABLE_LAB: "yes"
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/app/notebooks:rw
+      - ./data:/app/data:ro
+      - ./outputs:/app/outputs:rw
+      - ./scripts:/app/scripts:ro
+    networks:
+      - accessibility_network
+    command: >
+      jupyter lab
+      --ip=0.0.0.0
+      --port=8888
+      --no-browser
+      --allow-root
+      --NotebookApp.token=''
+      --NotebookApp.password=''
+    profiles:
+      - dev
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  accessibility_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ============================================================================
+# Volumes (Persistent Storage)
+# ============================================================================
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+# ============================================================================
+# Usage Examples
+# ============================================================================
+# 
+# Start database only:
+#   docker-compose up -d postgres
+# 
+# Run analysis pipeline once:
+#   docker-compose run --rm pipeline make run-all
+# 
+# Run specific accessibility method:
+#   docker-compose run --rm pipeline make run-enhanced
+# 
+# Start API server:
+#   docker-compose --profile api up -d api
+# 
+# Open pgAdmin (database management):
+#   docker-compose --profile admin up -d pgadmin
+#   Open: http://localhost:5050
+# 
+# Start Jupyter for interactive work:
+#   docker-compose --profile dev up -d jupyter
+#   Open: http://localhost:8888
+# 
+# Full development stack:
+#   docker-compose --profile dev --profile admin up -d
+# 
+# View logs:
+#   docker-compose logs -f pipeline
+#   docker-compose logs -f api
+# 
+# Stop all services:
+#   docker-compose down
+# 
+# Stop and remove volumes (DANGER: deletes data):
+#   docker-compose down -v
+# 
+# Database backup:
+#   docker-compose exec postgres pg_dump -U postgres healthcare_accessibility > backups/backup_$(date +%Y%m%d).sql
+# 
+# Restore database:
+#   docker-compose exec -T postgres psql -U postgres healthcare_accessibility < backups/backup_20240115.sql
+#
+# Connect to PostgreSQL shell:
+#   docker-compose exec postgres psql -U postgres -d healthcare_accessibility
+#
+# Check database size:
+#   docker-compose exec postgres psql -U postgres -d healthcare_accessibility -c "SELECT pg_size_pretty(pg_database_size('healthcare_accessibility'));"
+#
+# Rebuild after code changes:
+#   docker-compose build pipeline
+#   docker-compose up -d pipeline

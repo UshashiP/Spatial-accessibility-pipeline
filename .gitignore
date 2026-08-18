@@ -1,0 +1,24 @@
+# Python envs
+myenv/
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Local data and large artifacts
+data/
+outputs/results/
+outputs/figures/*interactive_map.html
+*.duckdb
+*.parquet
+*.feather
+*.gpkg
+*.zip
+
+# Logs
+logs/
+*.log
