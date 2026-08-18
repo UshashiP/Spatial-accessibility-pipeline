@@ -286,6 +286,7 @@ If APIs are unavailable or you want full reproducibility with local data:
 
 2. Download pre-prepared shapefiles OR use acquisition scripts:
    ```bash
+   python scripts/acquire_dc_data.py    # For DC
    python scripts/acquire_nyc_data.py   # For NYC
    python scripts/acquire_la_data.py    # For LA
    ```
@@ -341,16 +342,18 @@ mkdir -p data/intermediate_files
 **Required files for each city:**
 
 **DC:**
-- `blocksandtract_economic_final.shp` (enriched census blocks with sociodemographic variables)
-- `Intermediate_Care_Facilities.shp` (ICF facilities with bed counts)
+- Census blocks: `blocks_Washington_DC.shp` (from `acquire_dc_data.py`) OR `blocksandtract_economic_final.shp` (enriched with sociodemographics)
+- Facilities: `Intermediate_Care_Facilities.shp` (ICF facilities with bed counts)
 
 **NYC:**
-- `blocks_New_York_City_enhanced.shp` (enriched census blocks)
-- `Dialysis_NYC.shp` (dialysis centers with station counts)
+- Census blocks: `blocks_New_York_City.shp` (from `acquire_nyc_data.py`) OR `blocks_New_York_City_enhanced.shp` (enriched with sociodemographics)
+- Facilities: `Dialysis_NYC.shp` (dialysis centers with station counts)
 
 **LA:**
-- `blocks_Los_Angeles_enhanced.shp` (enriched census blocks)
-- `FQHC_LA.shp` (FQHC facilities)
+- Census blocks: `blocks_Los_Angeles.shp` (from `acquire_la_data.py`) OR `blocks_Los_Angeles_enhanced.shp` (enriched with sociodemographics)
+- Facilities: `FQHC_LA.shp` (FQHC facilities)
+
+**Note:** The acquisition scripts (`acquire_*.py`) download basic census blocks with population data. For the full **SDW-2SFCA** method with sociodemographic weighting, you need enriched blocks containing income, insurance, and age variables. The pipeline will run with basic blocks but will skip sociodemographic weighting if those columns are missing.
 
 **Step 2: Update config to use local data**
 
@@ -385,14 +388,15 @@ If using raw (unnormalized) values, the pipeline will min-max normalize them aut
 
 **Data acquisition scripts:**
 
-For LA and NYC, you can use the provided scripts to download and prepare local data:
+For all three cities, you can use the provided scripts to download and prepare local data:
 
 ```bash
-python scripts/acquire_la_data.py   # Downloads LA FQHC and blocks
-python scripts/acquire_nyc_data.py  # Downloads NYC dialysis and blocks
+python scripts/acquire_dc_data.py   # Downloads DC ICF facilities and blocks
+python scripts/acquire_nyc_data.py  # Downloads NYC dialysis centers and blocks
+python scripts/acquire_la_data.py   # Downloads LA FQHC facilities and blocks
 ```
 
-These scripts fetch from public sources (HRSA, CMS, Census TIGER) and save to `data/intermediate_files/`.
+These scripts fetch from public sources (CMS, HRSA, HIFLD, Census TIGER) and save to `data/intermediate_files/`.
 
 ### Configure a New City
 
@@ -499,6 +503,7 @@ This pipeline is a research tool and decision-support system, not ground truth. 
 │   └── accessibility_pipeline_dag.py
 │
 ├── scripts/                       # Data acquisition scripts
+│   ├── acquire_dc_data.py
 │   ├── acquire_nyc_data.py
 │   ├── acquire_la_data.py
 │   └── database/                  # SQL schema definitions
@@ -577,11 +582,10 @@ If you use this pipeline or the SDW-2SFCA method in your research, please cite:
 
 ```bibtex
 @software{spatial_accessibility_pipeline,
-  author = {Your Name},
+  author = {Ushashi Podder},
   title = {Spatial Accessibility Pipeline: An Open-Source SDW-2SFCA Implementation},
   year = {2026},
   url = {https://github.com/yourusername/healthcare-accessibility-research},
-  note = {Center for Geospatial Information Science, University of Maryland}
 }
 ```
 
@@ -601,9 +605,6 @@ If you use this pipeline or the SDW-2SFCA method in your research, please cite:
 
 - Jordahl, K., et al. (2020). geopandas/geopandas: v0.8.1. *Zenodo*. [https://doi.org/10.5281/zenodo.3946761](https://doi.org/10.5281/zenodo.3946761)
 
-## Acknowledgments
-
-This work was developed at the **Center for Geospatial Information Science, University of Maryland**. The pipeline builds on foundational 2SFCA research by Luo & Wang (2003) and extends it with socio-demographic weighting to address health equity concerns in underserved communities.
 
 ## License
 

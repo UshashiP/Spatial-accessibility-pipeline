@@ -72,8 +72,8 @@ CITIES = {
         },
     },
     "Los Angeles — FQHCs": {
-        "scores":    "outputs/results/gold/run_date=2026-06-06/ca_fqhc_scores.parquet",
-        "facilities":"outputs/results/silver/run_date=2026-06-04/dc_icf_facilities.parquet",
+        "scores":    "outputs/results/gold/run_date=2026-08-18/ca_fqhc_scores.parquet",
+        "facilities":"outputs/results/silver/run_date=2026-08-18/ca_fqhc_facilities.parquet",
         "crs":       "EPSG:32611",
         "facility":  "Federally Qualified Health Centers",
         "supply_label": "FQHC sites",
@@ -81,7 +81,9 @@ CITIES = {
         "gini_std":  None,
         "color":     "#f2a65a",
         "catchment": "1,600m",
-        "county_map": {},
+        "county_map": {
+            "06037": "Los Angeles",
+        },
     },
 }
 
@@ -155,12 +157,12 @@ with st.sidebar:
     st.markdown(f"""
     **Facility:** {cfg['facility']}
     **Catchment:** {cfg['catchment']}
-    **Method:** Enhanced 2SFCA
+    **Method:** SDW-2SFCA
     **Data:** 2020 US Census blocks
     """)
     st.markdown("---")
     st.markdown("""
-    **Enhanced 2SFCA** adds three components to standard proximity analysis:
+    **SDW-2SFCA** (Socio-demographically Weighted 2SFCA) adds three components to standard proximity analysis:
     - Truncated Gaussian distance decay
     - Supply-side capacity weighting
     - Sociodemographic demand adjustment
@@ -181,7 +183,7 @@ scores_gdf["county_name"] = scores_gdf["county_fips"].map(cfg["county_map"]).fil
 
 # ── Title ──────────────────────────────────────────────────────────────────────
 st.title("Healthcare Access Equity Intelligence")
-st.caption("Enhanced Two-Step Floating Catchment Area (2SFCA) · Washington DC · New York City · Los Angeles")
+st.caption("Socio-demographically Weighted Two-Step Floating Catchment Area (SDW-2SFCA) · Washington DC · New York City · Los Angeles")
 
 # ── Filters ────────────────────────────────────────────────────────────────────
 county_options = sorted(scores_gdf["county_name"].unique().tolist())
@@ -217,7 +219,7 @@ c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Census blocks",     f"{len(filtered):,}")
 c2.metric("Zero access",       f"{zero_pct:.1f}%")
 c3.metric("Pop. w/o access",   f"{zero_pop:,}")
-c4.metric("Gini (Enhanced)",   f"{gini_v:.3f}")
+c4.metric("Gini (SDW-2SFCA)",   f"{gini_v:.3f}")
 c5.metric(cfg["supply_label"].title(), f"{total_supply:,}" if total_supply else "N/A")
 
 # ── Executive insights ─────────────────────────────────────────────────────────
@@ -439,14 +441,68 @@ with tab5:
     > inequality than standard 2SFCA. In DC, standard 2SFCA reports Gini=0.00 (perfect equality)
     > while SDW-2SFCA reveals Gini=0.8203 — severe structural inequality hidden by proximity-only analysis.
     """)
+    
+    st.markdown("#### Zero-Access Population Comparison")
+    zero_data = pd.DataFrame({
+        "City": ["Washington DC", "New York City", "Los Angeles"],
+        "Zero-Access %": [38.0, 40.3, 42.1],
+        "Zero-Access Pop.": [303833, 3112366, 3800000],
+    })
+    fig3, (ax3a, ax3b) = plt.subplots(1, 2, figsize=(12, 4))
+    fig3.patch.set_facecolor("#0c0f14")
+    
+    # Zero-access percentage
+    ax3a.set_facecolor("#141922")
+    bars_pct = ax3a.barh(zero_data["City"], zero_data["Zero-Access %"], color=colors_l)
+    for i, (bar, val) in enumerate(zip(bars_pct, zero_data["Zero-Access %"])):
+        ax3a.text(val + 0.5, i, f"{val:.1f}%", va="center", fontsize=11, color="white", fontweight="bold")
+    ax3a.set_xlabel("% Blocks with Zero Access", color="white")
+    ax3a.set_xlim(0, 50)
+    ax3a.tick_params(colors="white")
+    ax3a.spines[:].set_color("#334155")
+    ax3a.grid(True, alpha=0.15, color="white", axis="x")
+    
+    # Zero-access population
+    ax3b.set_facecolor("#141922")
+    bars_pop = ax3b.barh(zero_data["City"], zero_data["Zero-Access Pop."], color=colors_l)
+    for i, (bar, val) in enumerate(zip(bars_pop, zero_data["Zero-Access Pop."])):
+        ax3b.text(val + 100000, i, f"{val/1e6:.1f}M", va="center", fontsize=11, color="white", fontweight="bold")
+    ax3b.set_xlabel("Population without Access", color="white")
+    ax3b.tick_params(colors="white")
+    ax3b.spines[:].set_color("#334155")
+    ax3b.grid(True, alpha=0.15, color="white", axis="x")
+    
+    plt.tight_layout()
+    st.pyplot(fig3)
+    plt.close(fig3)
 
 # ── Download ───────────────────────────────────────────────────────────────────
-csv = filtered.drop(columns="geometry").to_csv(index=False).encode("utf-8")
-st.download_button(
-    "📥 Download enhanced scores CSV", csv,
-    file_name=f"enhanced_2sfca_{city_key.split('—')[0].strip().lower().replace(' ','_')}.csv",
-    mime="text/csv", use_container_width=True,
-)
+st.markdown("### 📥 Export Results")
+col_dl1, col_dl2 = st.columns(2)
+
+with col_dl1:
+    csv = filtered.drop(columns="geometry").to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "Download as CSV", csv,
+        file_name=f"sdw2sfca_{city_key.split('—')[0].strip().lower().replace(' ','_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv", use_container_width=True,
+    )
+
+with col_dl2:
+    # Excel export with multiple sheets
+    from io import BytesIO
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        filtered.drop(columns="geometry")[["GEOID", "population", "accessibility_score", "accessibility_norm", "bivariate_class", "county_name"]].to_excel(writer, sheet_name="Scores", index=False)
+        if len(fac_gdf) > 0:
+            fac_export = fac_gdf.drop(columns="geometry") if "geometry" in fac_gdf.columns else fac_gdf
+            fac_export.to_excel(writer, sheet_name="Facilities", index=False)
+    excel_data = output.getvalue()
+    st.download_button(
+        "Download as Excel", excel_data,
+        file_name=f"sdw2sfca_{city_key.split('—')[0].strip().lower().replace(' ','_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True,
+    )
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown("---")
