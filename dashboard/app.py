@@ -321,7 +321,7 @@ with tab2:
     fig.patch.set_facecolor("#0c0f14")
     ax.set_facecolor("#141922")
     ax.plot([0,1],[0,1], "w--", linewidth=1, alpha=0.4, label="Perfect equality")
-    ax.plot(cp, ca, color=cfg["color"], linewidth=2.5, label=f"Enhanced 2SFCA (Gini={gini_v:.4f})")
+    ax.plot(cp, ca, color=cfg["color"], linewidth=2.5, label=f"SDW-2SFCA (Gini={gini_v:.4f})")
     ax.fill_between(cp, cp, ca, alpha=0.12, color=cfg["color"])
     if cfg["gini_std"] is not None:
         ax.plot([0,1],[0,1], color="#94a3b8", linewidth=1.5, linestyle=":",
@@ -340,7 +340,7 @@ with tab2:
     with col2:
         st.markdown(f"""
         <div style='background:#1b222e;border-radius:12px;padding:1.5rem;text-align:center;margin-bottom:1rem;border:1px solid rgba(62,199,166,.3)'>
-            <div style='font-size:.8rem;color:#94a3b8'>Enhanced 2SFCA</div>
+            <div style='font-size:.8rem;color:#94a3b8'>SDW-2SFCA</div>
             <div style='font-size:2.5rem;font-weight:700;color:{cfg["color"]}'>{gini_v:.3f}</div>
             <div style='font-size:.8rem;color:#94a3b8'>Severe inequality</div>
         </div>
@@ -419,7 +419,7 @@ with tab5:
     std_vals  = [0.00, 0.588, 0]
     colors_l  = ["#3ec7a6", "#2980b9", "#f2a65a"]
     x = np.arange(3)
-    bars = ax2.bar(x - 0.18, enh_vals, 0.32, color=colors_l, alpha=0.9, label="Enhanced 2SFCA")
+    bars = ax2.bar(x - 0.18, enh_vals, 0.32, color=colors_l, alpha=0.9, label="SDW-2SFCA")
     ax2.bar(x + 0.18, std_vals, 0.32, color="#475569", alpha=0.7, label="Standard 2SFCA")
     ax2.axhline(0.6, color="#ef4444", linestyle="--", linewidth=1, alpha=0.6, label="Severe threshold (0.6)")
     for bar, val in zip(bars, enh_vals):
