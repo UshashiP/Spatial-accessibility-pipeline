@@ -1,0 +1,89 @@
+# Spatial Accessibility Pipeline — Los Angeles FQHCs
+# Data source: HRSA Health Center Service Delivery Sites
+# Run: python run_pipeline.py --config case_studies/la_fqhc.yaml
+#
+# Setup:
+#   1. python scripts/acquire_la_data.py   (run once)
+#   2. Set use_snapshot: true below
+
+study_area:
+  name: "Los Angeles"
+  state_fips: "06"
+  state_abbrev: "CA"
+  county_fips: ["037"]
+  coordinate_system: "EPSG:32611"   # UTM Zone 11N (metres)
+  distance_unit: "meters"
+  clip_to_mainland: true
+  bbox: [-118.9448, 33.7037, -117.6464, 34.8233]
+
+facility:
+  type: "FQHC"
+  label: "Federally Qualified Health Centers"
+  cms_dataset_id: ""
+  cms_category_code: ""
+  supply_column: "supply"
+  supply_label: "FQHC sites"
+
+census:
+  base_url: "https://api.census.gov/data"
+  year: 2020
+  dataset: "dec/pl"
+  variables:
+    total_population: "P1_001N"
+  geography: "block"
+
+cms:
+  base_url: "https://data.hrsa.gov/DataDownload/DD_Files"
+
+analysis:
+  distance_threshold_m: 1600   # 1.6km (~20 min walk) — LA is car-dependent
+  decay_function: "gaussian"
+  population_column: "population"
+  method_label: "Enhanced 2SFCA"
+
+s3:
+  prefix: "healthcare-accessibility"
+  bronze: "bronze"
+  silver: "silver"
+  gold: "gold"
+  region: "us-east-1"
+  geoparquet_compression: "snappy"
+
+duckdb:
+  db_path: "outputs/results/la_fqhc_accessibility.duckdb"
+  gold_table: "accessibility_scores"
+
+data:
+  snapshot:
+    use_snapshot: true
+  local_shapefiles:
+    facilities: "data/intermediate_files/FQHC_LA.shp"
+    census_blocks: "data/intermediate_files/blocks_Los_Angeles_enhanced.shp"
+  population_column: "population"
+  intermediate:
+    path: "data/intermediate_files/"
+  output:
+    results: "outputs/results/"
+    figures: "outputs/figures/"
+
+validation:
+  min_population: 0
+  max_population: 100000
+  min_supply: 1
+  max_supply: 500
+  required_facility_columns: ["geometry", "supply"]
+  required_population_columns: ["geometry", "population"]
+  max_null_pct: 0.05
+
+visualization:
+  figure_dpi: 300
+  figure_size: [12, 10]
+  colormap: "RdYlBu"     # different colormap from DC/NYC for visual distinction
+  save_format: "png"
+  vmax_percentile: 95
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/la_pipeline.log"
+  console_output: true

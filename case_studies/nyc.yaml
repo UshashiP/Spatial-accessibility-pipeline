@@ -1,0 +1,88 @@
+# New York City — FOSS4G showcase case study
+# Facility: CMS Dialysis Facilities
+# Blocks:   2020 Census blocks with sociodemographic enrichment
+# CRS:      EPSG:32618 (UTM Zone 18N, metres)
+#
+# Run:
+#   python run_pipeline.py --config case_studies/nyc.yaml
+
+study_area:
+  name: "New York City"
+  state_fips: "36"
+  state_abbrev: "NY"
+  county_fips: ["005", "047", "061", "081", "085"]
+  bbox: [-74.25909, 40.477399, -73.700272, 40.917577]
+  coordinate_system: "EPSG:32618"
+  distance_unit: "meters"
+
+facility:
+  type: "dialysis"
+  label: "Dialysis Facilities"
+  cms_dataset_id: "23ew-n7w9"
+  cms_category_code: "21"
+  supply_column: "TOTAL_DIALYSIS_STATIONS"
+  supply_label: "Dialysis stations"
+
+census:
+  base_url: "https://api.census.gov/data"
+  year: 2020
+  dataset: "dec/pl"
+  variables:
+    total_population: "P1_001N"
+  geography: "block"
+
+cms:
+  base_url: "https://data.cms.gov/provider-data/api/1/datastore/query"
+
+analysis:
+  distance_threshold_m: 1200
+  decay_function: "gaussian"
+  population_column: "population"
+  method_label: "Enhanced 2SFCA"
+
+s3:
+  prefix: "healthcare-accessibility"
+  bronze: "bronze"
+  silver: "silver"
+  gold: "gold"
+  region: "us-east-1"
+  geoparquet_compression: "snappy"
+
+duckdb:
+  db_path: "outputs/results/nyc_dialysis_accessibility.duckdb"
+  gold_table: "accessibility_scores"
+
+data:
+  snapshot:
+    use_snapshot: true
+  local_shapefiles:
+    facilities: "data/intermediate_files/Dialysis_NYC.shp"
+    census_blocks: "data/intermediate_files/blocks_New_York_City_enhanced.shp"
+  population_column: "Total Popu"
+  intermediate:
+    path: "data/intermediate_files/"
+  output:
+    results: "outputs/results/"
+    figures: "outputs/figures/"
+
+validation:
+  min_population: 0
+  max_population: 50000
+  min_supply: 1
+  max_supply: 1000
+  required_facility_columns: ["geometry", "supply"]
+  required_population_columns: ["geometry", "population"]
+  max_null_pct: 0.05
+
+visualization:
+  figure_dpi: 300
+  figure_size: [12, 10]
+  colormap: "RdYlBu"
+  save_format: "png"
+  vmax_percentile: 95
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/nyc_pipeline.log"
+  console_output: true

@@ -1,0 +1,86 @@
+# Spatial Healthcare Accessibility Pipeline — Configuration
+# Architecture: Bronze / Silver / Gold medallion on AWS S3
+
+# ── Study Area ─────────────────────────────────────────────────────────────
+study_area:
+  name: "Washington DC"
+  state_fips: "11"           # DC FIPS code
+  coordinate_system: "EPSG:26985"   # Maryland State Plane NAD83 (meters)
+  distance_unit: "meters"
+
+# ── Census API ──────────────────────────────────────────────────────────────
+census:
+  base_url: "https://api.census.gov/data"
+  year: 2020
+  dataset: "dec/pl"
+  variables:
+    total_population: "P1_001N"
+  geography: "block"
+  # API key loaded from env: CENSUS_API_KEY
+
+# ── CMS / Facility API ──────────────────────────────────────────────────────
+cms:
+  base_url: "https://data.cms.gov/provider-data/api/1/datastore/query"
+  dataset_id: "78j2-v3zx"    # CMS Provider of Services – ICF/IID
+  facility_type: "ICF"
+  supply_column: "CRTFD_BED_CNT"
+  # API key loaded from env: CMS_API_KEY (optional for public endpoints)
+
+# ── Standard 2SFCA Parameters ───────────────────────────────────────────────
+analysis:
+  distance_threshold_m: 900   # catchment radius in metres (≈ 10 min walk)
+  decay_function: "gaussian"  # gaussian | binary
+  # Gaussian bandwidth equals distance_threshold_m
+  supply_column: "CRTFD_BED_CNT"
+  population_column: "population"
+
+# ── AWS S3 Medallion Storage ────────────────────────────────────────────────
+s3:
+  # Bucket name loaded from env: S3_BUCKET
+  prefix: "healthcare-accessibility"
+  bronze: "bronze"
+  silver: "silver"
+  gold:   "gold"
+  # Credentials loaded from env: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_DEFAULT_REGION
+  region: "us-east-1"
+  geoparquet_compression: "snappy"
+
+# ── DuckDB ──────────────────────────────────────────────────────────────────
+duckdb:
+  db_path: "outputs/results/accessibility.duckdb"
+  gold_table: "accessibility_scores"
+
+# ── Local Paths (fallback / dev) ────────────────────────────────────────────
+data:
+  shapefiles:
+    facilities: "data/intermediate_files/ICFs_DC.shp"
+    census_blocks: "data/intermediate_files/blocks_Washington_DC.shp"
+  output:
+    results: "outputs/results/"
+    figures: "outputs/figures/"
+  intermediate:
+    path: "data/intermediate_files/"
+
+# ── Validation Thresholds ───────────────────────────────────────────────────
+validation:
+  min_population: 0
+  max_population: 50000
+  min_beds: 1
+  max_beds: 1000
+  required_facility_columns: ["geometry", "CRTFD_BED_CNT"]
+  required_population_columns: ["geometry", "population"]
+  max_null_pct: 0.05          # fail if > 5 % nulls in key fields
+
+# ── Visualization ────────────────────────────────────────────────────────────
+visualization:
+  figure_dpi: 300
+  figure_size: [12, 10]
+  colormap: "viridis"
+  save_format: "png"
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/pipeline.log"
+  console_output: true
