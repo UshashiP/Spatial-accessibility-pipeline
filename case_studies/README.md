@@ -1,6 +1,6 @@
 # Case Studies
 
-Two reproducible case studies demonstrate the Enhanced 2SFCA pipeline.
+Two reproducible case studies demonstrate the SDW-2SFCA pipeline.
 
 | File | City | Facility type | Catchment (d₀) | CRS |
 |------|------|--------------|----------------|-----|
@@ -28,7 +28,7 @@ Select the city and facility type from the sidebar, provide an optional Census A
 
 Both configs default to `snapshot` mode (`data.snapshot.use_snapshot: true`), which reads from local shapefiles under `data/intermediate_files/`.  Set `use_snapshot: false` to fetch live data from the Census and CMS APIs.
 
-**DC enriched blocks** (`blocksandtract_economic_final.shp`) and **NYC enriched blocks** (`blocks_New_York_City_enhanced.shp`) must contain these columns for the sociodemographic demand weighting in the Enhanced 2SFCA model:
+**DC enriched blocks** (`blocksandtract_economic_final.shp`) and **NYC enriched blocks** (`blocks_New_York_City_enhanced.shp`) must contain these columns for the sociodemographic demand weighting in the SDW-2SFCA model:
 
 | Column | Description | Normalised range |
 |--------|-------------|-----------------|
