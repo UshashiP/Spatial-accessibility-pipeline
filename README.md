@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-This repository extends my paper on spatial accessibility by turning the DC Census block analysis into a reproducible data pipeline. The research core is the SDW-2SFCA / Enhanced 2SFCA method, and the engineering layer packages that method into ingestion, validation, transformation, orchestration, storage, analytics, and visualization components.
+This repository extends my paper on spatial accessibility by turning the DC Census block analysis into a reproducible data pipeline. The research core is the SDW-2SFCA, and the engineering layer packages that method into ingestion, validation, transformation, orchestration, storage, analytics, and visualization components.
 
 The main story of the project is simple: compute healthcare accessibility for census blocks, validate the data, automate the workflow with DAGs, and make the outputs easy to inspect and reproduce.
 
