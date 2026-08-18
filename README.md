@@ -37,9 +37,9 @@ The pipeline has been applied to three deliberately chosen case studies, each te
 
 | Study | Facility Type | Census Blocks | Facilities | Population | Catchment | Gini | Key Insight |
 |---|---:|---:|---:|---:|---:|---:|---|
-| **Washington, D.C.** | Intermediate Care Facilities (ICF) | ~6,000 | 114 | 620K | 900 m | **0.8203** | Starkest inequality: outer wards (SE/NE) systematically underserved |
-| **New York City** | Dialysis Centers | ~38,000 | 154 | 8.3M | 1,200 m | **0.7319** | Facilities cluster in Manhattan; outer boroughs face connectivity barriers |
-| **Los Angeles** | Federally Qualified Health Centers (FQHCs) | ~65,000 | 630 | 13M | 1,600 m | **0.6808** | More uniform primary care network, but topographic barriers strand pockets |
+| **Washington, D.C.** | Intermediate Care Facilities (ICF) | 6,012 | 114 | 620K | 900 m | **0.8203** | Starkest inequality: outer wards (SE/NE) systematically underserved |
+| **New York City** | Dialysis Centers | 37,984 | 154 | 8.3M | 1,200 m | **0.6555** | Facilities cluster in Manhattan; outer boroughs face connectivity barriers |
+| **Los Angeles** | Federally Qualified Health Centers (FQHCs) | 65,485 | 630 | 13M | 1,600 m | **0.7186** | More uniform primary care network, but topographic barriers strand pockets |
 
 ### Why These Three?
 
@@ -51,11 +51,11 @@ Together, they span different care models, geographies, and catchment patterns, 
 
 ### Findings
 
-**DC shows the starkest inequality**: a Gini of 0.8032, with zero-access blocks concentrated in outer wards where low-income, uninsured populations face the longest travel distances and the fewest nearby facilities.
+**DC shows the starkest inequality**: a Gini of 0.8203, with zero-access blocks concentrated in outer wards where low-income, uninsured populations face the longest travel distances and the fewest nearby facilities.
 
-**LA's primary care network is more uniform** (Gini 0.6808) but still strands pockets of population behind topographical barriers (canyons, mountains) and in areas of sparse settlement.
+**NYC shows moderate inequality** (Gini 0.6555), with dialysis facilities clustering in Manhattan and connectivity challenges in outer boroughs creating pockets of underservice despite overall network density.
 
-**NYC sits between them** (Gini 0.7319), with dialysis facilities clustering in Manhattan and connectivity challenges in outer boroughs creating pockets of underservice despite overall network density.
+**LA falls between them** (Gini 0.7186), with FQHC coverage more widespread but still stranded pockets behind topographical barriers (canyons, mountains) and in areas of sparse settlement.
 
 ### Reproducibility
 
@@ -263,23 +263,59 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements-dev.txt
 ```
 
-### Run a Case Study
+### Prerequisites: Data Access
+
+The pipeline requires either:
+
+**Option A: Census API Key (recommended for live data)**
 
 ```bash
-# Option 1: Run DC case study (default)
-python run_pipeline.py --config case_studies/dc.yaml
-
-# Option 2: Use the Makefile
-make run
-
-# Option 3: Run tests first
-make pytest
-python run_pipeline.py --config case_studies/dc.yaml
+export CENSUS_API_KEY="your_key_here"
 ```
 
+Request a free key at [https://api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html)
+
+**Option B: Local Shapefiles (recommended for reproducibility)**
+
+If APIs are unavailable or you want full reproducibility with local data:
+
+1. Create the data directory:
+   ```bash
+   mkdir -p data/intermediate_files
+   ```
+
+2. Download pre-prepared shapefiles OR use acquisition scripts:
+   ```bash
+   python scripts/acquire_nyc_data.py   # For NYC
+   python scripts/acquire_la_data.py    # For LA
+   ```
+
+3. Configure your YAML to use local data (see "Using Local Data" section below)
+
+### Run the Pipeline
+
+**Entry point**: `run_pipeline.py` — orchestrates all stages from ingestion to visualization.
+
+```bash
+# Run a case study (DC, NYC, or LA)
+python run_pipeline.py --config case_studies/dc.yaml
+python run_pipeline.py --config case_studies/nyc.yaml
+python run_pipeline.py --config case_studies/la_fqhc.yaml
+
+# Or use the Makefile
+make run
+```
+
+**What it does:**
+1. **Ingest**: Loads Census blocks and facility data (API or local files)
+2. **Validate**: Runs quality gates (Bronze → Silver)
+3. **Transform**: Computes SDW-2SFCA accessibility scores (Silver → Gold)
+4. **Analytics**: Builds DuckDB database with aggregations and Gini calculations
+5. **Visualize**: Generates 5 publication-ready maps and charts
+
 **Outputs** will be written to:
-- `outputs/results/` — GeoParquet, shapefiles, DuckDB database
-- `outputs/figures/` — PNG maps and charts
+- `outputs/results/` — GeoParquet, shapefiles, CSV, DuckDB database
+- `outputs/figures/` — PNG maps, Lorenz curves, bivariate analysis
 - `logs/` — execution logs with timing and statistics
 
 ### Launch the Dashboard

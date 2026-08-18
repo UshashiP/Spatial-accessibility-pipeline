@@ -50,6 +50,7 @@ CITIES = {
         "crs":       "EPSG:26985",
         "facility":  "Intermediate Care Facilities",
         "supply_label": "certified beds",
+        "gini_sdw":  0.8203,
         "gini_std":  0.00,
         "color":     "#3ec7a6",
         "catchment": "900m",
@@ -61,6 +62,7 @@ CITIES = {
         "crs":       "EPSG:32618",
         "facility":  "Dialysis Centers",
         "supply_label": "dialysis stations",
+        "gini_sdw":  0.6555,
         "gini_std":  0.588,
         "color":     "#2980b9",
         "catchment": "1,200m",
@@ -75,6 +77,7 @@ CITIES = {
         "crs":       "EPSG:32611",
         "facility":  "Federally Qualified Health Centers",
         "supply_label": "FQHC sites",
+        "gini_sdw":  0.7186,
         "gini_std":  None,
         "color":     "#f2a65a",
         "catchment": "1,600m",
@@ -84,15 +87,12 @@ CITIES = {
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def _gini(scores: np.ndarray, pop: np.ndarray) -> float:
-    order = np.argsort(scores)
-    s, p = scores[order], pop[order].astype(float)
-    cum_p = np.cumsum(p) / p.sum()
-    cum_a = np.cumsum(s * p)
-    if cum_a[-1] > 0:
-        cum_a = cum_a / cum_a[-1]
-    else:
-        cum_a = cum_p.copy()
-    return float(1 - 2 * np.trapz(cum_a, cum_p))
+    """Unweighted Gini coefficient treating each block equally."""
+    x = np.sort(scores.astype(float))
+    n = len(x)
+    if x.sum() == 0:
+        return 0.0
+    return float((2 * np.sum(np.arange(1, n + 1) * x)) / (n * x.sum()) - (n + 1) / n)
 
 def _lorenz(scores: np.ndarray, pop: np.ndarray):
     order = np.argsort(scores)
@@ -404,10 +404,10 @@ with tab5:
     st.markdown("#### Same pipeline · One YAML change · Three cities")
     comp = pd.DataFrame({
         "Metric": ["Facility type","Census blocks","Facilities","Zero-access blocks",
-                   "Pop. w/o access","Gini (Enhanced)","Gini (Standard)","Catchment"],
-        "Washington DC": ["ICF/IDD","6,012","114","38%","303,833","0.721","0.00","900m"],
-        "New York City": ["Dialysis","37,984","135","47%","3,112,366","0.652","0.588","1,200m"],
-        "Los Angeles":   ["FQHCs","65,626+","808","42.1%","~3.8M","0.747","N/A","1,600m"],
+                   "Pop. w/o access","Gini (SDW-2SFCA)","Gini (Standard)","Catchment"],
+        "Washington DC": ["ICF/IDD","6,012","114","38.0%","303,833","0.8203","0.00","900m"],
+        "New York City": ["Dialysis","37,984","154","40.3%","3,112,366","0.6555","0.588","1,200m"],
+        "Los Angeles":   ["FQHCs","65,485","630","42.1%","~3.8M","0.7186","N/A","1,600m"],
     })
     st.dataframe(comp.set_index("Metric"), use_container_width=True)
 
@@ -415,7 +415,7 @@ with tab5:
     fig2.patch.set_facecolor("#0c0f14")
     ax2.set_facecolor("#141922")
     cities_l  = ["DC\n(ICFs)", "NYC\n(Dialysis)", "LA\n(FQHCs)"]
-    enh_vals  = [0.721, 0.652, 0.747]
+    enh_vals  = [0.8203, 0.6555, 0.7186]
     std_vals  = [0.00, 0.588, 0]
     colors_l  = ["#3ec7a6", "#2980b9", "#f2a65a"]
     x = np.arange(3)
@@ -435,9 +435,9 @@ with tab5:
     plt.close(fig2)
 
     st.markdown("""
-    > **Key finding:** Across all three cities the enhanced method reveals significantly higher
+    > **Key finding:** Across all three cities the SDW-2SFCA method reveals significantly higher
     > inequality than standard 2SFCA. In DC, standard 2SFCA reports Gini=0.00 (perfect equality)
-    > while the enhanced method reveals Gini=0.721 — severe structural inequality hidden by proximity-only analysis.
+    > while SDW-2SFCA reveals Gini=0.8203 — severe structural inequality hidden by proximity-only analysis.
     """)
 
 # ── Download ───────────────────────────────────────────────────────────────────

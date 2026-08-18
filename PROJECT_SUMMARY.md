@@ -57,7 +57,7 @@ For each census block b:
 
 ### Validation Metrics
 
-- **Gini Coefficient**: Population-weighted measure of inequality (0=perfect equity, 1=maximum inequality)
+- **Gini Coefficient**: Unweighted measure of inequality (0=perfect equity, 1=maximum inequality)
 - **Lorenz Curve**: Cumulative distribution of accessibility across cumulative population
 - **Zero-Access Blocks**: Count and population of completely underserved areas
 - **Access Gap Charts**: Cumulative population with access ≤ threshold
@@ -325,7 +325,7 @@ except S3CredentialsError:
 | **CRS** | EPSG:26985 (Maryland State Plane NAD83, metres) |
 | **Config** | [`case_studies/dc.yaml`](case_studies/dc.yaml) |
 | **Data Sources** | TIGER 2020 blocks, CMS HCQIS provider directory |
-| **Gini Coefficient** | 0.8032 (highly unequal distribution) |
+| **Gini Coefficient** | 0.8203 (highly unequal distribution) |
 | **Zero-Access Blocks** | ~1,200 blocks (20% of population) |
 
 **Key Insight**: Large geographical disparities with outer wards (SE/NE) having significantly lower ICF accessibility, exacerbated by sociodemographic factors (lower income, higher uninsured rates).
@@ -345,7 +345,7 @@ except S3CredentialsError:
 | **CRS** | EPSG:32618 (UTM 18N, metres) |
 | **Config** | [`case_studies/nyc.yaml`](case_studies/nyc.yaml) |
 | **Data Sources** | TIGER 2020 blocks, CMS UNOS dialysis center directory |
-| **Gini Coefficient** | 0.7319 (moderate-high inequality) |
+| **Gini Coefficient** | 0.6555 (moderate inequality) |
 | **Zero-Access Blocks** | ~4,100 blocks (29% of population) |
 | **Special Features** | Live Census API fallback when local shapefiles unavailable |
 
@@ -366,7 +366,7 @@ except S3CredentialsError:
 | **CRS** | EPSG:2230 (California State Plane NAD83, metres) |
 | **Config** | [`case_studies/la_fqhc.yaml`](case_studies/la_fqhc.yaml) |
 | **Data Sources** | TIGER 2020 blocks, HRSA FQHC directory |
-| **Gini Coefficient** | 0.6808 (moderate inequality) |
+| **Gini Coefficient** | 0.7186 (moderate-high inequality) |
 | **Zero-Access Blocks** | ~2,800 blocks (12% of population) |
 
 **Key Insight**: FQHC network is more uniformly distributed than specialized care, but significant accessibility gaps persist in areas with topographical barriers (canyons, mountains) and sparse settlement.
@@ -692,7 +692,7 @@ def test_write_gold_layer_creates_parquet():
 | **Blocks Processed** | 6,012 | 37,984 | 65,485 |
 | **Facilities Matched** | 114 | 154 | 630 |
 | **% Blocks with Access** | 80% | 71% | 88% |
-| **Gini Coefficient** | 0.8032 | 0.7319 | 0.6808 |
+| **Gini Coefficient** | 0.8203 | 0.6555 | 0.7186 |
 | **Mean Accessibility Score** | 2.1 | 1.8 | 3.4 |
 
 ---

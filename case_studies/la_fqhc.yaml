@@ -41,6 +41,13 @@ analysis:
   population_column: "population"
   method_label: "SDW-2SFCA"
 
+data:
+  snapshot:
+    use_snapshot: true
+  local_shapefiles:
+    facilities: "data/intermediate_files/FQHC_LA.shp"
+    census_blocks: "data/intermediate_files/blocks_Los_Angeles_enhanced.shp"
+
 s3:
   prefix: "healthcare-accessibility"
   bronze: "bronze"

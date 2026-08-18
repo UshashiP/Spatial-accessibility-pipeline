@@ -64,20 +64,12 @@ def _base_cfg(config: dict) -> dict:
 
 
 def _gini(values: np.ndarray, weights: np.ndarray | None = None) -> float:
-    """Population-weighted Gini so map title matches the Lorenz curve."""
-    if weights is None:
-        weights = np.ones_like(values, dtype=float)
-    mask = values >= 0
-    v = values[mask].astype(float)
-    w = weights[mask].astype(float)
-    if w.sum() == 0 or v.sum() == 0:
+    """Unweighted Gini coefficient treating each block equally (matches paper)."""
+    x = np.sort(values.astype(float))
+    n = len(x)
+    if x.sum() == 0:
         return 0.0
-    order = np.argsort(v)
-    v, w = v[order], w[order]
-    cum_pop    = np.cumsum(w) / w.sum()
-    cum_access = np.cumsum(v * w)
-    cum_access = cum_access / cum_access[-1]
-    return float(1 - 2 * np.trapz(cum_access, cum_pop))
+    return float((2 * np.sum(np.arange(1, n + 1) * x)) / (n * x.sum()) - (n + 1) / n)
 
 
 def _method_label(config: dict) -> str:
@@ -167,7 +159,7 @@ def plot_accessibility_map(
 
     # Stats — population-weighted so map title matches the Lorenz curve
     pop_w   = result_gdf["population"].values.astype(float) if "population" in result_gdf.columns else None
-    gini    = _gini(result_gdf[score_col].values, weights=pop_w)
+    gini    = _gini(result_gdf[score_col].values)
     n_zero  = (result_gdf[score_col] == 0).sum()
     mean_s  = result_gdf[score_col].mean()
 
@@ -219,7 +211,7 @@ def plot_lorenz_curve(
     else:
         cum_access = cum_pop.copy()
 
-    gini = _gini(scores, weights=pop)
+    gini = _gini(scores)
 
     fig, ax = plt.subplots(figsize=(9, 7))
 
