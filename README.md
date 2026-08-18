@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-This repository extends my paper on spatial accessibility by turning the DC Census block analysis into a reproducible data pipeline. The research core is the SDW-2SFCA, and the engineering layer packages that method into ingestion, validation, transformation, orchestration, storage, analytics, and visualization components.
+This repository extends my work on spatial accessibility by turning the DC Census block analysis into a reproducible data pipeline. The research core is a socio-demographically weighted 2SFCA framework developed here, and the engineering layer packages that method into ingestion, validation, transformation, orchestration, storage, analytics, and visualization components.
 
 The main story of the project is simple: compute healthcare accessibility for census blocks, validate the data, automate the workflow with DAGs, and make the outputs easy to inspect and reproduce.
 
@@ -25,22 +25,26 @@ The repository currently focuses on the Washington, D.C. case study from the pap
 |---|---:|---:|---:|---|
 | Washington, D.C. | Intermediate Care Facilities | ~6,000 | 900 m | EPSG:26985 |
 | New York City | Dialysis Facilities | ~38,000 | 1,200 m | EPSG:32618 |
+| Los Angeles | Federally Qualified Health Centers (FQHCs) | Countywide block set | 1,600 m | EPSG:32611 |
 
 Run a case study with:
 
 ```bash
 python run_pipeline.py --config case_studies/dc.yaml
 python run_pipeline.py --config case_studies/nyc.yaml
+python run_pipeline.py --config case_studies/la_fqhc.yaml
 ```
 
 See [`case_studies/README.md`](case_studies/README.md) for the required fields and configuration notes.
 
 ## Method
 
-The accessibility score is based on 2SFCA, with two practical extensions used in the paper implementation:
+The accessibility score is based on the standard 2SFCA framework, extended here with two methodological features developed for this project:
 
 1. Truncated Gaussian distance decay so influence drops to zero at the catchment boundary.
-2. Sociodemographic demand weighting so blocks are not treated as equally burdened when income, insurance coverage, and working-age population differ.
+2. Socio-demographic demand weighting so blocks are not treated as equally burdened when income, insurance coverage, and working-age population differ.
+
+Together, these produce a socio-demographically weighted 2SFCA framework (SDW-2SFCA) used throughout the pipeline and case studies.
 
 The implementation uses `scipy.cKDTree` to keep the spatial search efficient as the number of blocks and facilities grows.
 
