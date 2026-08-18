@@ -39,7 +39,7 @@ analysis:
   distance_threshold_m: 1600   # 1.6km (~20 min walk) — LA is car-dependent
   decay_function: "gaussian"
   population_column: "population"
-  method_label: "Enhanced 2SFCA"
+  method_label: "SDW-2SFCA"
 
 s3:
   prefix: "healthcare-accessibility"

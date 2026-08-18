@@ -38,7 +38,7 @@ analysis:
   distance_threshold_m: 1200
   decay_function: "gaussian"
   population_column: "population"
-  method_label: "Enhanced 2SFCA"
+  method_label: "SDW-2SFCA"
 
 s3:
   prefix: "healthcare-accessibility"
