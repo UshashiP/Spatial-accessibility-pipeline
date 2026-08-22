@@ -271,8 +271,7 @@ div[data-testid="metric-container"]:hover {
 # ── Data Configuration ─────────────────────────────────────────────────────────
 CITIES = {
     "Washington DC — ICF Facilities": {
-        "scores": "outputs/results/gold/run_date=2026-08-18/dc_icf_scores.parquet",
-        "facilities": "outputs/results/silver/run_date=2026-08-18/dc_icf_facilities.parquet",
+        "prefix": "dc_icf",
         "crs": "EPSG:26985",
         "facility": "Intermediate Care Facilities",
         "supply_label": "certified beds",
@@ -280,8 +279,7 @@ CITIES = {
         "catchment": "900m",
     },
     "New York City — Dialysis Centers": {
-        "scores": "outputs/results/gold/run_date=2026-06-04/ny_dialysis_scores.parquet",
-        "facilities": "outputs/results/silver/run_date=2026-06-04/ny_dialysis_facilities.parquet",
+        "prefix": "ny_dialysis",
         "crs": "EPSG:32618",
         "facility": "Dialysis Centers",
         "supply_label": "dialysis stations",
@@ -289,8 +287,7 @@ CITIES = {
         "catchment": "1,200m",
     },
     "Los Angeles — FQHCs": {
-        "scores": "outputs/results/gold/run_date=2026-08-18/ca_fqhc_scores.parquet",
-        "facilities": "outputs/results/silver/run_date=2026-08-18/ca_fqhc_facilities.parquet",
+        "prefix": "ca_fqhc",
         "crs": "EPSG:32611",
         "facility": "Federally Qualified Health Centers",
         "supply_label": "FQHC sites",
@@ -300,10 +297,22 @@ CITIES = {
 }
 
 # ── Helper Functions ───────────────────────────────────────────────────────────
+def find_latest_parquet(layer: str, dataset: str) -> Path | None:
+    """Find the most recent parquet file for a dataset in a layer."""
+    root = Path("outputs/results") / layer
+    candidates = sorted(root.glob(f"run_date=*/{dataset}.parquet"))
+    if not candidates:
+        return None
+    return candidates[-1]  # Most recent date
+
 @st.cache_data(show_spinner="📊 Loading data...")
-def load_scores(path: str) -> gpd.GeoDataFrame:
+def load_scores(prefix: str) -> gpd.GeoDataFrame:
     """Load accessibility scores with proper error handling."""
     try:
+        path = find_latest_parquet("gold", f"{prefix}_scores")
+        if not path:
+            st.error(f"No score files found for {prefix}")
+            return gpd.GeoDataFrame()
         gdf = gpd.read_parquet(path)
         if "accessibility_score" not in gdf.columns:
             gdf["accessibility_score"] = 0.0
@@ -314,9 +323,13 @@ def load_scores(path: str) -> gpd.GeoDataFrame:
         return gpd.GeoDataFrame()
 
 @st.cache_data(show_spinner=False)
-def load_facilities(path: str) -> gpd.GeoDataFrame:
+def load_facilities(prefix: str) -> gpd.GeoDataFrame:
     """Load facility locations."""
     try:
+        path = find_latest_parquet("silver", f"{prefix}_facilities")
+        if not path:
+            st.warning(f"No facility files found for {prefix}")
+            return gpd.GeoDataFrame()
         return gpd.read_parquet(path)
     except Exception as e:
         st.warning(f"Could not load facilities: {e}")
@@ -406,8 +419,8 @@ def main():
         """, unsafe_allow_html=True)
     
     # Load Data
-    scores_gdf = load_scores(cfg["scores"])
-    facilities_gdf = load_facilities(cfg["facilities"])
+    scores_gdf = load_scores(cfg["prefix"])
+    facilities_gdf = load_facilities(cfg["prefix"])
     
     if scores_gdf.empty:
         st.error("❌ Could not load data. Please check file paths.")
