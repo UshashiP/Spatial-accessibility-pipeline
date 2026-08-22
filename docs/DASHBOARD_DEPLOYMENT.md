@@ -5,7 +5,9 @@ This dashboard runs locally by default, but it can be deployed publicly.
 ## Local Run
 
 ```bash
-PYTHONPATH=. streamlit run dashboard/enhanced_2sfca_dashboard.py --server.port 8501
+python launch_dashboard.py
+# or directly:
+streamlit run dashboard/app_modern.py --server.port 8501
 ```
 
 - Local URL: `http://localhost:8501`
@@ -14,13 +16,9 @@ PYTHONPATH=. streamlit run dashboard/enhanced_2sfca_dashboard.py --server.port 8
 ## Option 1: Streamlit Community Cloud
 
 1. Push this repository to GitHub.
-2. Create `secrets.toml` in Streamlit Cloud settings with:
-   - `CENSUS_API_KEY = "..."`
-3. Set app entrypoint to:
-   - `dashboard/enhanced_2sfca_dashboard.py`
-4. In App settings, add environment variable:
-   - `PYTHONPATH=.`
-5. Deploy.
+2. Set app entrypoint to:
+   - `dashboard/app_modern.py`
+3. Deploy.
 
 ## Option 2: Render (Web Service)
 
@@ -34,12 +32,8 @@ pip install -r requirements.txt
 3. Start command:
 
 ```bash
-PYTHONPATH=. streamlit run dashboard/enhanced_2sfca_dashboard.py --server.port $PORT --server.address 0.0.0.0
+streamlit run dashboard/app_modern.py --server.port $PORT --server.address 0.0.0.0
 ```
-
-4. Add environment variables:
-   - `CENSUS_API_KEY=...`
-   - `PYTHONPATH=.`
 
 ## Option 3: Docker
 

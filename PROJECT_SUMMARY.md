@@ -102,8 +102,7 @@ healthcare_accessibility_research/
 │       └── s3_store.py                # Parquet + GeoParquet to S3 or local outputs/
 │
 ├── dashboard/                         # ✅ Interactive Streamlit web app
-│   ├── app.py                         # Placeholder (main is enhanced_2sfca_dashboard.py)
-│   └── enhanced_2sfca_dashboard.py    # Full dashboard (DC, NYC, LA case studies)
+│   └── app_modern.py                  # Modern dashboard with beautiful gradient UI
 │
 ├── dags/                              # Airflow DAG for scheduled pipeline runs
 │   └── accessibility_pipeline_dag.py
@@ -564,35 +563,33 @@ ca_fqhc_accessibility.csv
 
 ## 9. DASHBOARD APPLICATION
 
-### Streamlit Interactive Dashboard
-**File**: `dashboard/enhanced_2sfca_dashboard.py`
+### Modern Streamlit Dashboard
+**File**: `dashboard/app_modern.py`
 
 **Features**:
-1. **City Selector**: Dropdown to switch between DC / NYC / LA
-2. **Facility Type Selector**: Auto-populated from config (ICF, Dialysis, FQHC)
-3. **Sociodemographic Weighting Toggle**: Enable/disable demand weighting
-4. **Scenario Multiplier Slider**: Simulate 0.5–2.0× facility bed capacity
-5. **Live Results Display**:
-   - Updated accessibility choropleth
-   - Summary statistics (Gini, zero-access population)
-   - Facilities meeting demand vs. shortfall
-6. **CSV Export**: Download accessibility scores to file
+1. **Beautiful Gradient UI**: Modern purple gradient theme with Inter font family
+2. **City Selector**: Switch between DC / NYC / LA case studies
+3. **Interactive Maps**: Red-to-green color scheme (red = low access, green = high access)
+4. **Inequality Analysis**: Lorenz curves with Gini coefficients
+5. **Priority Zones**: Automatic identification of high-need, low-access areas
+6. **Export Options**: Download results as CSV or GeoJSON for GIS analysis
 
 **Data Flow**:
 ```
-User selects city → Load population (API or shapefile)
-                 → Load facilities from S3 or local
-                 → Run Enhanced 2SFCA
-                 → Display results + metrics
-                 → Export CSV
+User selects city → Load pre-computed results from outputs/results/
+                 → Display accessibility map with intuitive colors
+                 → Show inequality metrics and priority zones
+                 → Enable export to CSV/GeoJSON
 ```
 
-**Deployment Options**:
-- **Local**: `streamlit run dashboard/enhanced_2sfca_dashboard.py`
-- **Docker**: `docker-compose up streamlit`
+**Launch Options**:
+- **Quick Launcher**: `python launch_dashboard.py`
+- **Direct Command**: `streamlit run dashboard/app_modern.py`
 - **Streamlit Cloud**: Push to GitHub, connect via dashboard.streamlit.io
-- **Render.com**: Containerized deployment with environment secrets
-- **AWS EC2 / Azure VM**: Manual setup with Nginx reverse proxy
+- **Render.com**: Containerized deployment
+- **Docker**: `docker-compose up streamlit`
+
+**Deployment**: See [docs/DASHBOARD_DEPLOYMENT.md](docs/DASHBOARD_DEPLOYMENT.md) for cloud deployment guides.
 
 ---
 
@@ -704,14 +701,11 @@ def test_write_gold_layer_creates_parquet():
 # Install dependencies
 pip install -r requirements-dev.txt
 
-# Configure Census API key (if live ingestion needed)
-export CENSUS_API_KEY="your-key-here"
-
 # Run pipeline for DC
 python run_pipeline.py --config case_studies/dc.yaml
 
 # Launch dashboard
-streamlit run dashboard/enhanced_2sfca_dashboard.py
+python launch_dashboard.py
 ```
 
 ### Option B: Docker (Isolated Environment)
@@ -721,30 +715,27 @@ docker build -t healthcare-accessibility:latest .
 
 # Run pipeline inside container
 docker run --rm \
-  -e CENSUS_API_KEY="your-key" \
   -v $(pwd)/outputs:/app/outputs \
   healthcare-accessibility:latest \
   python run_pipeline.py --config case_studies/dc.yaml
 
 # Run Streamlit inside container
 docker run -p 8501:8501 \
-  -e CENSUS_API_KEY="your-key" \
   healthcare-accessibility:latest \
-  streamlit run dashboard/enhanced_2sfca_dashboard.py
+  streamlit run dashboard/app_modern.py
 ```
 
 ### Option C: Streamlit Cloud
 ```bash
-# 1. Push code to GitHub (healthcare_acc_pipeline branch)
-git push origin healthcare_acc_pipeline
+# 1. Push code to GitHub
+git push origin main
 
 # 2. Go to https://share.streamlit.io/
 #    Connect GitHub account
-#    Select repo + branch + app file
+#    Select repo + branch
+#    Set app file to: dashboard/app_modern.py
 
-# 3. Add secrets in Streamlit Cloud console
-#    CENSUS_API_KEY = "your-key"
-#    S3_BUCKET = "optional-bucket-name"
+# 3. Deploy (no secrets required for pre-computed results)
 
 # 4. Dashboard live at: https://yourusername-healthcare-accessibility.streamlit.app/
 ```

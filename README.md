@@ -161,35 +161,47 @@ A new city means editing config, not rewriting code. This is the key to reproduc
 
 ## Decision-Support Capabilities
 
-### Interactive Scenario Testing
+### Interactive Dashboard for Results Exploration
 
-The **Streamlit dashboard** (`dashboard/enhanced_2sfca_dashboard.py`) enables planners and analysts to:
+The **Healthcare Access Intelligence Dashboard** ([dashboard/app_modern.py](dashboard/app_modern.py)) enables planners and analysts to:
 
-- **Change catchment radii** and see accessibility recompute in real time
-- **Toggle supply assumptions**: uniform (1 per facility), raw metadata, or type-weighted
-- **Add hypothetical facilities**: click a location, recompute, observe Gini change
-- **Compare weighting models**: standard 2SFCA vs SDW-2SFCA side-by-side
-- **Drill down by neighborhood**: click a block to see population, accessibility score, and sociodemographic profile
+- **Switch between three cities**: DC (ICF), NYC (Dialysis), LA (FQHCs)
+- **Explore interactive visualizations**:
+  - Choropleth maps with red-to-green accessibility color scheme
+  - Lorenz curves with Gini coefficients for inequality measurement
+  - Priority zone identification (high population + low access areas)
+  - Distribution histograms and statistical summaries
+- **Export results**: Download data as CSV or GeoJSON for GIS analysis
+- **View detailed metrics**: Zero-access population, Gini coefficients, facility counts
+- **Modern UI**: Beautiful gradient design with intuitive navigation
+
+### Dashboard Capabilities
+
+**Current Features:**
+- Pre-computed accessibility scores from pipeline runs
+- Interactive filtering and exploration of results
+- Publication-ready visualizations
+- Data export functionality
+- Cross-city comparative analysis
+
+**Pipeline Features (for scenario testing):**
+- Run `python run_pipeline.py --config <modified_config.yaml>` to test different catchment radii
+- Edit YAML configs to change facility networks, distance thresholds, or decay functions
+- Compare multiple pipeline runs by examining outputs in `outputs/results/` and `outputs/figures/`
 
 ### Use Cases
 
-**Health System Planners**: "If we open 3 new FQHCs in South LA, what happens to zero-access population?"
+**Health System Planners**: "Which census blocks have the lowest accessibility scores and highest population density?"
 
-**City Officials**: "Which census tracts have high need (low income, high uninsured rate) but low access?"
+**City Officials**: "How does our city's healthcare access inequality compare to similar metros?"
 
-**Community Advocates**: "Show me the Lorenz curve comparison: does the current network treat residents equitably?"
+**Community Advocates**: "Show me the Lorenz curve — does the current network treat residents equitably?"
 
-**Researchers**: "What is the Gini coefficient for dialysis access in NYC under 1km vs 2km catchments?"
+**Researchers**: "Export the accessibility scores and sociodemographic data for regression analysis."
 
-### Real-Time Recomputation
+### Architecture: Dashboard vs Pipeline
 
-The dashboard is not a static visualization tool. It recomputes accessibility on parameter change, enabling:
-
-- Near-real-time scenario exploration (30–90 seconds for full recomputation on 30,000+ blocks)
-- Immediate feedback on policy interventions
-- Comparative analysis across cities and facility types
-
-This turns the pipeline from a **batch analytics tool** into a **decision-support system**.
+The **dashboard** displays pre-computed results from pipeline runs, enabling fast exploration without recomputation. For scenario testing (changing parameters, adding facilities), edit the YAML configuration and rerun the pipeline — results are typically ready in 2–5 minutes for cities with 6K–65K blocks.
 
 ## Outputs and Visualizations
 
@@ -227,24 +239,49 @@ Cumulative population with access below threshold values, surfacing the number o
 
 ## Interactive Dashboard
 
-The **Streamlit dashboard** enables near-real-time scenario exploration:
+The **Healthcare Access Intelligence Dashboard** provides a modern, intuitive interface for exploring accessibility results with real-time analysis.
+
+### Quick Launch
+
+**Option 1: Using the Launcher** (Recommended)
 
 ```bash
-pip install -r requirements-dev.txt
-streamlit run dashboard/enhanced_2sfca_dashboard.py
+python launch_dashboard.py
 ```
 
-**Features:**
-- Load DC, NYC, or LA case studies interactively
-- Toggle supply assumptions (uniform, raw, type-weighted)
-- Change catchment radii and see Gini recompute
-- View Lorenz curves and summary statistics
-- Export results to GeoJSON or CSV
-- Compare standard vs SDW-2SFCA side-by-side
+**Option 2: Direct Streamlit Command**
 
-The dashboard is designed for **policy analysts, health system planners, and community advocates** who need to test scenarios without writing code.
+```bash
+streamlit run dashboard/app_modern.py
+```
 
-**Live public dashboard**: [https://healthcare-access-dashboardgit-ddozdt5ppbz9q3xnslre94.streamlit.app/](https://healthcare-access-dashboardgit-ddozdt5ppbz9q3xnslre94.streamlit.app/)
+Then navigate to **http://localhost:8501** in your browser.
+
+### Dashboard Features
+
+- **🎨 Modern UI**: Beautiful gradient interface with purple theme and intuitive design
+- **🗺️ Interactive Maps**: Red-to-green color scheme (red = low access, green = high access)
+- **📊 Inequality Analysis**: Lorenz curves with Gini coefficients for measuring equity
+- **🎯 Priority Zones**: Automatic identification of high-population, low-access areas
+- **📥 Data Export**: Download results as CSV or GeoJSON for further analysis
+- **🏙️ Multi-City Support**: Easily switch between DC, NYC, and LA case studies
+
+### Troubleshooting
+
+- **No data showing?** Run the pipeline first: `python run_pipeline.py --config case_studies/dc.yaml`
+- **Data not updating?** Click the ☰ menu → "Clear cache" → "Rerun" to reload
+- **Port already in use?** Stop any running Streamlit instances or change the port:
+  ```bash
+  streamlit run dashboard/app_modern.py --server.port 8502
+  ```
+
+**For scenario testing** (changing catchment radii, facility networks, etc.), edit the YAML configuration and rerun the pipeline:
+```bash
+# Edit case_studies/dc.yaml to change parameters
+python run_pipeline.py --config case_studies/dc.yaml
+# Results appear in outputs/results/
+# Refresh dashboard to see updated data
+```
 
 ## Quick Start
 
@@ -321,11 +358,22 @@ make run
 
 ### Launch the Dashboard
 
+**Option 1: Quick Launcher** (Easiest)
 ```bash
-streamlit run dashboard/enhanced_2sfca_dashboard.py
+python launch_dashboard.py
 ```
 
-Open your browser to `http://localhost:8501` and explore interactively.
+**Option 2: Direct Command**
+```bash
+streamlit run dashboard/app_modern.py
+```
+
+Open your browser to `http://localhost:8501` and:
+- Select a city from the sidebar dropdown
+- Explore the interactive map with red-to-green accessibility visualization
+- View inequality analysis with Lorenz curves and Gini coefficients
+- Identify priority zones requiring policy attention
+- Export results as CSV or GeoJSON for further analysis
 
 ### Using Local Data (When APIs Fail)
 
@@ -495,9 +543,8 @@ This pipeline is a research tool and decision-support system, not ground truth. 
 │   ├── la_fqhc.yaml               # Los Angeles / FQHCs
 │   └── README.md                  # Config field documentation
 │
-├── dashboard/                     # Interactive Streamlit app
-│   ├── enhanced_2sfca_dashboard.py
-│   └── app.py
+├── dashboard/                     # Interactive Streamlit dashboard
+│   └── app_modern.py              # **Modern dashboard** with beautiful UI
 │
 ├── dags/                          # Airflow orchestration
 │   └── accessibility_pipeline_dag.py
@@ -530,6 +577,7 @@ This pipeline is a research tool and decision-support system, not ground truth. 
 │   ├── DASHBOARD_DEPLOYMENT.md    # Streamlit hosting guide
 │   └── POSTGRES_INSTALLATION.md   # Optional PostGIS setup
 │
+├── launch_dashboard.py            # Quick dashboard launcher
 ├── run_pipeline.py                # CLI entrypoint
 ├── config.yaml                    # Default config (DC study)
 ├── requirements.txt               # Production dependencies
