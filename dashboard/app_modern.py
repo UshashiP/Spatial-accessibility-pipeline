@@ -357,12 +357,13 @@ def create_lorenz_data(scores: np.ndarray, population: np.ndarray):
 def main():
     # ═══ TOP SECTION: Header ═══
     st.markdown("""
-    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; text-align: center;'>
-        <h1 style='color: white; margin: 0; font-size: 1.8rem; font-weight: 700;'>
-            🏥 Healthcare Access Intelligence
+    <div style='background: white; 
+                border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; text-align: center;
+                border: 2px solid #e5e7eb;'>
+        <h1 style='color: #000000; margin: 0; font-size: 2.4rem; font-weight: 700;'>
+            🏥 Healthcare Intelligence App
         </h1>
-        <p style='color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 0.95rem;'>
+        <p style='color: #4b5563; margin: 0.5rem 0 0 0; font-size: 0.95rem;'>
             Spatial Distance-Weighted Two-Step Floating Catchment Area (SDW-2SFCA) Analysis
         </p>
     </div>
@@ -749,8 +750,6 @@ def render_footer():
     <div style='background: linear-gradient(135deg, #1e293b 0%, #334155 100%); 
                 border-radius: 12px; padding: 2rem; color: white; margin-top: 2rem;'>
         <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;'>
-            
-            <!-- About Section -->
             <div>
                 <h3 style='color: white; font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center;'>
                     🏥 About This Dashboard
@@ -760,8 +759,6 @@ def render_footer():
                     underserved areas and guide policy decisions.
                 </p>
             </div>
-            
-            <!-- Methods Section -->
             <div>
                 <h3 style='color: white; font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center;'>
                     📊 Methodology
