@@ -38,39 +38,39 @@ st.markdown("""
 }
 
 .stApp {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #f8fafc;
 }
 
 .main > div {
     background: white;
-    border-radius: 20px;
-    padding: 1.5rem 2rem;
-    margin: 1rem;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    border-radius: 16px;
+    padding: 1rem 1.5rem;
+    margin: 0.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 /* Header */
 h1 {
-    font-size: 2.2rem;
-    font-weight: 800;
+    font-size: 1.6rem;
+    font-weight: 700;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     margin-bottom: 0.25rem;
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
 }
 
 h2 {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: #374151;
-    margin-top: 1rem;
-    margin-bottom: 0.75rem;
+    margin-top: 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
 h3 {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 600;
     color: #4b5563;
     margin-top: 0.5rem;
@@ -357,14 +357,14 @@ def create_lorenz_data(scores: np.ndarray, population: np.ndarray):
 def main():
     # Header - Compact version
     st.markdown("""
-    <div style='text-align: center; padding: 0.5rem 0 1rem 0;'>
-        <div style='font-size: 3rem; margin-bottom: 0.5rem;'>🏥</div>
+    <div style='text-align: center; padding: 0.25rem 0 0.5rem 0;'>
+        <span style='font-size: 1.5rem;'>🏥</span>
     </div>
     """, unsafe_allow_html=True)
     
     st.title("Healthcare Access Intelligence")
     st.markdown("""
-    <p style='font-size: 1rem; color: #6b7280; text-align: center; margin-bottom: 1.5rem;'>
+    <p style='font-size: 0.9rem; color: #6b7280; text-align: center; margin-bottom: 0.75rem;'>
         Real-time SDW-2SFCA Analysis & Accessibility Metrics
     </p>
     """, unsafe_allow_html=True)
