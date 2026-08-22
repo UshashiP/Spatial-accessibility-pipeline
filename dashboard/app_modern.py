@@ -355,18 +355,17 @@ def create_lorenz_data(scores: np.ndarray, population: np.ndarray):
 
 # ── Main Application ───────────────────────────────────────────────────────────
 def main():
-    # Header - Compact version
+    # ═══ TOP SECTION: Header ═══
     st.markdown("""
-    <div style='text-align: center; padding: 0.25rem 0 0.5rem 0;'>
-        <span style='font-size: 1.5rem;'>🏥</span>
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; text-align: center;'>
+        <h1 style='color: white; margin: 0; font-size: 1.8rem; font-weight: 700;'>
+            🏥 Healthcare Access Intelligence
+        </h1>
+        <p style='color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 0.95rem;'>
+            Spatial Distance-Weighted Two-Step Floating Catchment Area (SDW-2SFCA) Analysis
+        </p>
     </div>
-    """, unsafe_allow_html=True)
-    
-    st.title("Healthcare Access Intelligence")
-    st.markdown("""
-    <p style='font-size: 0.9rem; color: #6b7280; text-align: center; margin-bottom: 0.75rem;'>
-        Real-time SDW-2SFCA Analysis & Accessibility Metrics
-    </p>
     """, unsafe_allow_html=True)
     
     # Sidebar Controls
@@ -434,52 +433,30 @@ def main():
     zero_access_pct = (scores == 0).mean() * 100
     zero_access_pop = int(scores_gdf.loc[scores == 0, "population"].sum())
     
-    # Key Metrics Section
-    st.markdown("<h2 style='margin-top: 1rem; margin-bottom: 0.75rem;'>📈 Key Metrics</h2>", unsafe_allow_html=True)
+    # ═══ Quick Stats Bar ═══
+    st.markdown("""
+    <div style='background: #f8fafc; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; 
+                display: flex; justify-content: space-around; border: 1px solid #e2e8f0;'>
+        <div style='text-align: center;'>
+            <div style='font-size: 1.5rem; font-weight: 700; color: #667eea;'>{:,}</div>
+            <div style='font-size: 0.75rem; color: #64748b; text-transform: uppercase;'>Census Blocks</div>
+        </div>
+        <div style='text-align: center;'>
+            <div style='font-size: 1.5rem; font-weight: 700; color: #10b981;'>{:,}</div>
+            <div style='font-size: 0.75rem; color: #64748b; text-transform: uppercase;'>Facilities</div>
+        </div>
+        <div style='text-align: center;'>
+            <div style='font-size: 1.5rem; font-weight: 700; color: #ef4444;'>{:.1f}%</div>
+            <div style='font-size: 0.75rem; color: #64748b; text-transform: uppercase;'>Zero Access</div>
+        </div>
+        <div style='text-align: center;'>
+            <div style='font-size: 1.5rem; font-weight: 700; color: #f59e0b;'>{:.3f}</div>
+            <div style='font-size: 0.75rem; color: #64748b; text-transform: uppercase;'>Gini Index</div>
+        </div>
+    </div>
+    """.format(len(scores_gdf), len(facilities_gdf), zero_access_pct, gini), unsafe_allow_html=True)
     
-    col1, col2, col3, col4, col5 = st.columns(5)
-    
-    with col1:
-        st.metric(
-            label="Census Blocks",
-            value=f"{len(scores_gdf):,}",
-            delta=None
-        )
-    
-    with col2:
-        st.metric(
-            label="Facilities",
-            value=f"{len(facilities_gdf):,}",
-            delta=None
-        )
-    
-    with col3:
-        st.metric(
-            label="Zero Access",
-            value=f"{zero_access_pct:.1f}%",
-            delta=f"{zero_access_pop:,} people",
-            delta_color="inverse"
-        )
-    
-    with col4:
-        st.metric(
-            label="Gini Coefficient",
-            value=f"{gini:.3f}",
-            delta="Lower is better",
-            delta_color="off"
-        )
-    
-    with col5:
-        st.metric(
-            label="Mean Score",
-            value=f"{scores.mean():.2f}",
-            delta=f"Max: {scores.max():.1f}",
-            delta_color="off"
-        )
-    
-    st.markdown("<div style='margin: 1rem 0;'></div>", unsafe_allow_html=True)
-    
-    # Tabs for different visualizations
+    # ═══ BODY SECTION: Main Content ═══
     tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Interactive Map", "📊 Inequality Analysis", "🎯 Priority Zones", "📥 Export Data"])
     
     with tab1:
@@ -493,6 +470,10 @@ def main():
     
     with tab4:
         render_export_tab(scores_gdf)
+    
+    # ═══ BOTTOM SECTION: Footer ═══
+    st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
+    render_footer()
 
 # ── Tab Renderers ──────────────────────────────────────────────────────────────
 def render_map_tab(scores_gdf, facilities_gdf, cfg):
@@ -761,6 +742,49 @@ def render_export_tab(scores_gdf):
             mime="application/geo+json",
             use_container_width=True
         )
+
+def render_footer():
+    """Render professional footer with credits and links."""
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #1e293b 0%, #334155 100%); 
+                border-radius: 12px; padding: 2rem; color: white; margin-top: 2rem;'>
+        <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;'>
+            
+            <!-- About Section -->
+            <div>
+                <h3 style='color: white; font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center;'>
+                    🏥 About This Dashboard
+                </h3>
+                <p style='color: rgba(255,255,255,0.8); font-size: 0.9rem; line-height: 1.6;'>
+                    Analyzes healthcare accessibility using a spatially explicit SDW-2SFCA approach to identify 
+                    underserved areas and guide policy decisions.
+                </p>
+            </div>
+            
+            <!-- Methods Section -->
+            <div>
+                <h3 style='color: white; font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center;'>
+                    📊 Methodology
+                </h3>
+                <p style='color: rgba(255,255,255,0.8); font-size: 0.9rem; line-height: 1.6;'>
+                    <strong>SDW-2SFCA:</strong> Spatial Distance-Weighted Two-Step Floating Catchment Area<br>
+                    <strong>Data:</strong> 2020 Census blocks, CMS facility locations<br>
+                    <strong>Distance:</strong> Euclidean distance with Gaussian decay
+                </p>
+            </div>
+        </div>
+        
+        <hr style='border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 1.5rem 0;'>
+        
+        <div style='text-align: center; color: rgba(255,255,255,0.7); font-size: 0.85rem;'>
+            <p style='margin: 0;'>
+                © 2026 Healthcare Access Intelligence Dashboard | 
+                <a href='https://github.com/UshashiP' style='color: #a5b4fc; text-decoration: none;'>Ushashi Poddar</a> | 
+                Data sources: U.S. Census Bureau, CMS
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ── Run Application ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
