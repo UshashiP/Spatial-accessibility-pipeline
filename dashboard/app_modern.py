@@ -403,20 +403,6 @@ def main():
         """, unsafe_allow_html=True)
         
         st.markdown("</div>", unsafe_allow_html=True)
-        
-        st.markdown("<hr style='margin: 1.5rem 0; border-color: rgba(255, 255, 255, 0.3);'>", unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div style='background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 1rem; border: 1px solid rgba(255, 255, 255, 0.2);'>
-            <h3 style='color: white; font-size: 0.9rem; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;'>
-                ℹ️ About
-            </h3>
-            <p style='color: rgba(255, 255, 255, 0.95); font-size: 0.85rem; line-height: 1.5;'>
-                This dashboard analyzes healthcare accessibility using the 
-                Spatial Distance-Weighted Two-Step Floating Catchment Area (SDW-2SFCA) method.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
     
     # Load Data
     scores_gdf = load_scores(cfg["prefix"])
@@ -745,41 +731,25 @@ def render_export_tab(scores_gdf):
         )
 
 def render_footer():
-    """Render professional footer with credits and links."""
+    """Render professional footer with credits."""
+    st.markdown("---")
     st.markdown("""
-    <div style='background: linear-gradient(135deg, #1e293b 0%, #334155 100%); 
-                border-radius: 12px; padding: 2rem; color: white; margin-top: 2rem;'>
-        <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;'>
-            <div>
-                <h3 style='color: white; font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center;'>
-                    🏥 About This Dashboard
-                </h3>
-                <p style='color: rgba(255,255,255,0.8); font-size: 0.9rem; line-height: 1.6;'>
-                    Analyzes healthcare accessibility using a spatially explicit SDW-2SFCA approach to identify 
-                    underserved areas and guide policy decisions.
-                </p>
-            </div>
-            <div>
-                <h3 style='color: white; font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center;'>
-                    📊 Methodology
-                </h3>
-                <p style='color: rgba(255,255,255,0.8); font-size: 0.9rem; line-height: 1.6;'>
-                    <strong>SDW-2SFCA:</strong> Spatial Distance-Weighted Two-Step Floating Catchment Area<br>
-                    <strong>Data:</strong> 2020 Census blocks, CMS facility locations<br>
-                    <strong>Distance:</strong> Euclidean distance with Gaussian decay
-                </p>
-            </div>
-        </div>
-        
-        <hr style='border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 1.5rem 0;'>
-        
-        <div style='text-align: center; color: rgba(255,255,255,0.7); font-size: 0.85rem;'>
-            <p style='margin: 0;'>
-                © 2026 Healthcare Access Intelligence Dashboard | 
-                <a href='https://github.com/UshashiP' style='color: #a5b4fc; text-decoration: none;'>Ushashi Poddar</a> | 
-                Data sources: U.S. Census Bureau, CMS
-            </p>
-        </div>
+    <div style='text-align: center; padding: 1.5rem; background: #f8fafc; border-radius: 8px;'>
+        <h3 style='color: #334155; font-size: 1.1rem; margin-bottom: 1rem;'>🏥 About This Dashboard</h3>
+        <p style='color: #64748b; font-size: 0.9rem; line-height: 1.6; max-width: 800px; margin: 0 auto 1rem auto;'>
+            Analyzes healthcare accessibility using Spatial Distance-Weighted Two-Step Floating Catchment Area (SDW-2SFCA) method 
+            to identify underserved areas and guide policy decisions.
+        </p>
+        <p style='color: #94a3b8; font-size: 0.85rem;'>
+            <strong>Data:</strong> 2020 Census blocks, CMS facility locations | 
+            <strong>Distance:</strong> Euclidean with Gaussian decay
+        </p>
+        <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 1rem 0;'>
+        <p style='color: #64748b; font-size: 0.85rem; margin: 0.5rem 0;'>
+            © 2026 Healthcare Intelligence App | 
+            <a href='https://github.com/UshashiP' style='color: #667eea; text-decoration: none;'>Ushashi Poddar</a> | 
+            Data sources: U.S. Census Bureau, CMS
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
