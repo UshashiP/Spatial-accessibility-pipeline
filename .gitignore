@@ -11,10 +11,22 @@ __pycache__/
 
 # Local data and large artifacts
 data/
-outputs/results/
 outputs/figures/*interactive_map.html
 *.duckdb
+
+# Dashboard data - keep specific parquet files for deployment
 *.parquet
+!outputs/results/gold/**/dc_icf_scores.parquet
+!outputs/results/gold/**/ny_dialysis_scores.parquet
+!outputs/results/gold/**/ca_fqhc_scores.parquet
+!outputs/results/silver/**/dc_icf_facilities.parquet
+!outputs/results/silver/**/ny_dialysis_facilities.parquet
+!outputs/results/silver/**/ca_fqhc_facilities.parquet
+
+# Ignore other result files (CSVs, DuckDB, shapefiles)
+outputs/results/*.csv
+outputs/results/*.duckdb
+outputs/results/bronze/
 *.feather
 *.gpkg
 *.zip
