@@ -271,8 +271,8 @@ div[data-testid="metric-container"]:hover {
 # ── Data Configuration ─────────────────────────────────────────────────────────
 CITIES = {
     "Washington DC — ICF Facilities": {
-        "scores": "outputs/results/gold/run_date=2026-06-04/dc_icf_scores.parquet",
-        "facilities": "outputs/results/silver/run_date=2026-06-04/dc_icf_facilities.parquet",
+        "scores": "outputs/results/gold/run_date=2026-08-18/dc_icf_scores.parquet",
+        "facilities": "outputs/results/silver/run_date=2026-08-18/dc_icf_facilities.parquet",
         "crs": "EPSG:26985",
         "facility": "Intermediate Care Facilities",
         "supply_label": "certified beds",
