@@ -57,7 +57,11 @@ data:
   local_shapefiles:
     facilities: "data/intermediate_files/ICFs_DC.shp"
     census_blocks: "data/intermediate_files/blocksandtract_economic_final.shp"
-  population_column: "Total Popu"
+  # Bl_totalpo is the 2020 block count, except the 1,512 zero-population blocks are
+  # set to the median (62), so it sums to 783,289 vs 689,545 in the official
+  # 2020 counts. "Total Popu" is a tract-level value repeated on every block of
+  # the tract, so summing it overcounts (21.7M).
+  population_column: "Bl_totalpo"
   intermediate:
     path: "data/intermediate_files/"
   output:

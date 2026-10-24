@@ -273,6 +273,17 @@ def compute_enhanced_2sfca(
 
 # ── Pipeline wrapper ──────────────────────────────────────────────────────────
 
+_POPULATION_COLUMN_CANDIDATES = (
+    "population", "Bl_totalpo", "Total Popu", "TotalPopul", "Total po_3",
+)
+
+
+def _resolve_population_column(population_gdf: gpd.GeoDataFrame) -> Optional[str]:
+    return next(
+        (c for c in _POPULATION_COLUMN_CANDIDATES if c in population_gdf.columns), None
+    )
+
+
 def run_enhanced_transform(
     population_gdf: gpd.GeoDataFrame,
     facility_gdf: gpd.GeoDataFrame,
@@ -316,20 +327,13 @@ def run_enhanced_transform(
 
     d0 = float(config["analysis"]["distance_threshold_m"])
 
-    # Resolve population column — Bl_totalpo is the verified column for DC data.
-    # Try common aliases in order of preference.
-    pop_col_candidates = [
-        "Bl_totalpo",   # DC blocksandtract_economic_final.shp — verified
-        "Total Popu",   # alternative DC column (raw counts — will be normalised)
-        "TotalPopul", "population", "Total po_3",
-    ]
-    pop_col = next(
-        (c for c in pop_col_candidates if c in population_gdf.columns), None
-    )
+    # Ingest renames the configured population column to "population", so that
+    # column is authoritative; the others are fallbacks for unconfigured data.
+    pop_col = _resolve_population_column(population_gdf)
     if pop_col is None:
         raise ValueError(
             "run_enhanced_transform: no recognised population column found.\n"
-            f"Expected one of {pop_col_candidates}.\n"
+            f"Expected one of {_POPULATION_COLUMN_CANDIDATES}.\n"
             f"Available columns: {population_gdf.columns.tolist()}"
         )
 
