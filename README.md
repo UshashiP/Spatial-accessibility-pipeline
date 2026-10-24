@@ -11,7 +11,7 @@ The **Spatial Accessibility Pipeline** is an extension of a novel spatial access
 This repository transforms that research method into a **production-ready, open-source geospatial data pipeline** that enables health systems, city planners, and policy analysts to:
 
 - **Identify healthcare access deserts** at census block resolution
-- **Quantify access inequality** using population-weighted Gini coefficients and Lorenz curves
+- **Quantify access inequality** using Gini coefficients (each census block counted equally) and population-weighted Lorenz curves
 - **Compare facility networks** across cities, facility types, and policy scenarios
 - **Test "what-if" scenarios** interactively (add clinics, change catchment radii, adjust supply assumptions)
 - **Reproduce analyses for any jurisdiction** using open data and configuration-driven workflows
@@ -38,7 +38,7 @@ The pipeline has been applied to three deliberately chosen case studies, each te
 | Study | Facility Type | Census Blocks | Facilities | Population | Catchment | Gini | Key Insight |
 |---|---:|---:|---:|---:|---:|---:|---|
 | **Washington, D.C.** | Intermediate Care Facilities (ICF) | 6,012 | 114 | 620K | 900 m | **0.8203** | Starkest inequality: outer wards (SE/NE) systematically underserved |
-| **New York City** | Dialysis Centers | 37,984 | 154 | 8.3M | 1,200 m | **0.6555** | Facilities cluster in Manhattan; outer boroughs face connectivity barriers |
+| **New York City** | Dialysis Centers | 37,984 | 135 | 8.8M | 1,200 m | **0.7705** | Facilities cluster in Manhattan; outer boroughs face connectivity barriers |
 | **Los Angeles** | Federally Qualified Health Centers (FQHCs) | 65,485 | 630 | 13M | 1,600 m | **0.7186** | More uniform primary care network, but topographic barriers strand pockets |
 
 ### Why These Three?
@@ -53,9 +53,9 @@ Together, they span different care models, geographies, and catchment patterns, 
 
 **DC shows the starkest inequality**: a Gini of 0.8203, with zero-access blocks concentrated in outer wards where low-income, uninsured populations face the longest travel distances and the fewest nearby facilities.
 
-**NYC shows moderate inequality** (Gini 0.6555), with dialysis facilities clustering in Manhattan and connectivity challenges in outer boroughs creating pockets of underservice despite overall network density.
+**NYC shows high inequality** (Gini 0.7705; 46.6% of blocks have no dialysis center within 1,200 m), with dialysis facilities clustering in Manhattan and connectivity challenges in outer boroughs creating pockets of underservice despite overall network density.
 
-**LA falls between them** (Gini 0.7186), with FQHC coverage more widespread but still stranded pockets behind topographical barriers (canyons, mountains) and in areas of sparse settlement.
+**LA shows the least inequality of the three** (Gini 0.7186), with FQHC coverage more widespread but still stranded pockets behind topographical barriers (canyons, mountains) and in areas of sparse settlement.
 
 ### Reproducibility
 
@@ -163,17 +163,17 @@ A new city means editing config, not rewriting code. This is the key to reproduc
 
 ### Interactive Dashboard for Results Exploration
 
-The **Healthcare Access Intelligence Dashboard** ([dashboard/app_modern.py](dashboard/app_modern.py)) enables planners and analysts to:
+The **Healthcare Access Intelligence Dashboard** ([dashboard/app.py](dashboard/app.py)) enables planners and analysts to:
 
 - **Switch between three cities**: DC (ICF), NYC (Dialysis), LA (FQHCs)
 - **Explore interactive visualizations**:
-  - Choropleth maps with red-to-green accessibility color scheme
+  - Choropleth map with a teal accessibility scale, zero-access blocks in orange
   - Lorenz curves with Gini coefficients for inequality measurement
   - Priority zone identification (high population + low access areas)
   - Distribution histograms and statistical summaries
 - **Export results**: Download data as CSV or GeoJSON for GIS analysis
 - **View detailed metrics**: Zero-access population, Gini coefficients, facility counts
-- **Modern UI**: Beautiful gradient design with intuitive navigation
+- **Clear overview**: Residents with no access, key finding, and tabbed navigation
 
 ### Dashboard Capabilities
 
@@ -209,7 +209,7 @@ The pipeline produces publication-ready visualizations that make inequality legi
 
 ### 1. Accessibility Choropleth
 
-Block-level accessibility scores with facility overlays. Color scale uses a softened RdYlBu colormap (red = low access, blue = high access). Map title includes population-weighted Gini coefficient and zero-access block count.
+Block-level accessibility scores with facility overlays. Color scale uses a softened RdYlBu colormap (red = low access, blue = high access). Map title includes the Gini coefficient (each census block counted equally) and the zero-access block count.
 
 ![Washington, D.C. accessibility map](outputs/figures/dc_icf_accessibility_map.png)
 
@@ -252,15 +252,56 @@ python launch_dashboard.py
 **Option 2: Direct Streamlit Command**
 
 ```bash
-streamlit run dashboard/app_modern.py
+streamlit run dashboard/app.py
 ```
 
 Then navigate to **http://localhost:8501** in your browser.
 
+### About the Dashboard
+
+The dashboard ([dashboard/app.py](dashboard/app.py)) is branded **CareScape — Healthcare
+Access Intelligence**. The earlier version, [dashboard/app_modern.py](dashboard/app_modern.py),
+is kept for reference. Both read the same pre-computed results.
+
+The overview leads with the number of residents living in zero-access blocks, followed by the
+share of blocks with no access, facility count, and Gini index, plus a one-sentence key finding.
+Metric cards have explanatory tooltips. For DC, resident counts are the official 2020 Census
+block counts ([reference file](dashboard/reference/dc_icf_block_population_2020.csv), rebuilt with
+`python scripts/data_preparation/official_block_population.py`). The published scores were computed
+with a population input in which the 1,512 empty DC blocks were set to the median (62), which
+totals 783,289 instead of the official 689,545; exports keep that input as `population_model_input`.
+
+Map hover cards identify blocks by Census Block GEOID and show accessibility score,
+population, study-facility count within the configured catchment, and nearest study
+facility distance. Proximity uses projected, metre-based centroid distances, matching
+the pipeline's spatial approach, not travel routes. Missing facility data is shown as
+unavailable rather than zero. Facility proximity does not imply available capacity or
+eligibility, and the Gini index describes study-wide inequality, not individual blocks.
+
+The map uses a single teal color scale for blocks with a score above zero,
+linear and capped at the selected study's 95th-percentile score. Scores above the cap
+share the highest color, with a `+` on the legend. Blocks with no modeled access
+(score 0) are drawn in orange with their own legend entry, so they stand out from
+low-but-nonzero access. These are within-study display scales, not cross-city
+comparisons, and they do not change raw scores, hover values, or exports. If the
+percentile cutoff is zero, the scale falls back to the full range.
+
+The map uses an OpenStreetMap basemap and an optional study-facility layer with small
+markers. Facility hover cards show names and recorded supply where available, not live
+availability (FQHC supply counts sites). Detailed interpretation notes live in the collapsed
+"About this map" section. Census blocks remain the analysis layer; no hexagon aggregation
+is applied. "About this map" names the selected study and its catchment radius:
+900 m for DC ICFs, 1,200 m for NYC dialysis centers, and 1,600 m for LA FQHCs.
+
+The score distribution chart shows blocks scoring above zero up to the 95th percentile and
+reports the zero-score and above-cap counts in its caption. The Priority areas tab applies a
+simple screening rule (above-median population, below-median score) and offers the full list
+of priority blocks as a CSV. Downloads are named after the selected study.
+
 ### Dashboard Features
 
-- **🎨 Modern UI**: Beautiful gradient interface with purple theme and intuitive design
-- **🗺️ Interactive Maps**: Red-to-green color scheme (red = low access, green = high access)
+- **🎨 Clean UI**: Light analytics layout with a residents-first overview and key finding
+- **🗺️ Interactive Maps**: Teal scale for scored blocks (darker = higher access); orange = no access
 - **📊 Inequality Analysis**: Lorenz curves with Gini coefficients for measuring equity
 - **🎯 Priority Zones**: Automatic identification of high-population, low-access areas
 - **📥 Data Export**: Download results as CSV or GeoJSON for further analysis
@@ -272,7 +313,7 @@ Then navigate to **http://localhost:8501** in your browser.
 - **Data not updating?** Click the ☰ menu → "Clear cache" → "Rerun" to reload
 - **Port already in use?** Stop any running Streamlit instances or change the port:
   ```bash
-  streamlit run dashboard/app_modern.py --server.port 8502
+  streamlit run dashboard/app.py --server.port 8502
   ```
 
 **For scenario testing** (changing catchment radii, facility networks, etc.), edit the YAML configuration and rerun the pipeline:
@@ -365,12 +406,12 @@ python launch_dashboard.py
 
 **Option 2: Direct Command**
 ```bash
-streamlit run dashboard/app_modern.py
+streamlit run dashboard/app.py
 ```
 
 Open your browser to `http://localhost:8501` and:
 - Select a city from the sidebar dropdown
-- Explore the interactive map with red-to-green accessibility visualization
+- Explore the interactive map (teal scale; zero-access blocks in orange)
 - View inequality analysis with Lorenz curves and Gini coefficients
 - Identify priority zones requiring policy attention
 - Export results as CSV or GeoJSON for further analysis
@@ -544,7 +585,9 @@ This pipeline is a research tool and decision-support system, not ground truth. 
 │   └── README.md                  # Config field documentation
 │
 ├── dashboard/                     # Interactive Streamlit dashboard
-│   └── app_modern.py              # **Modern dashboard** with beautiful UI
+│   ├── app.py                     # **CareScape dashboard** (current)
+│   ├── map_details.py             # Block proximity details and map color scale
+│   └── app_modern.py              # Previous dashboard version
 │
 ├── dags/                          # Airflow orchestration
 │   └── accessibility_pipeline_dag.py

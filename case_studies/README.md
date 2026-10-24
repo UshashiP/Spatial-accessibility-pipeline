@@ -23,7 +23,7 @@ The Healthcare Access Intelligence Dashboard displays pre-computed results for a
 ```bash
 python launch_dashboard.py
 # or directly:
-streamlit run dashboard/app_modern.py
+streamlit run dashboard/app.py
 ```
 
 Select the city from the sidebar to explore accessibility scores, Lorenz curves, priority zones, and inequality analysis with a modern, intuitive interface.
