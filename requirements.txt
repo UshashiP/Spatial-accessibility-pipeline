@@ -35,7 +35,7 @@ tenacity>=8.2.0          # retry logic for API calls
 # ── Visualisation ────────────────────────────────────────────────────────────
 matplotlib>=3.8.0
 pillow>=10.0.0
-streamlit>=1.36.0
+streamlit>=1.50.0
 streamlit-folium>=0.15.0  # Folium integration for Streamlit
 folium>=0.14.0            # interactive maps
 s3fs>=2024.3.1
@@ -44,7 +44,7 @@ openpyxl>=3.1.0           # Excel export
 # ── Dash (Plotly) Dashboard ──────────────────────────────────────────────────
 # dash>=2.14.0              # High-performance interactive dashboards
 # dash-bootstrap-components>=1.5.0  # Bootstrap UI components for Dash
-plotly>=5.18.0            # Interactive plots and maps
+plotly>=5.24.0          # px.choropleth_map / Scattermap (MapLibre) need 5.24+
 # kaleido>=0.2.1            # Static image export for Plotly
 
 # ── Testing & Code Quality ───────────────────────────────────────────────────
@@ -70,7 +70,7 @@ sqlalchemy
 dbt-postgres
 ruff
 
-streamlit>=1.32.0
+streamlit>=1.50.0
 geopandas>=0.14.0
 pandas>=2.0.0
 numpy>=1.24.0

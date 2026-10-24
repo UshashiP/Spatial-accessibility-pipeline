@@ -477,13 +477,13 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
     # Create Plotly choropleth
     scores_4326 = scores_gdf.to_crs("EPSG:4326")
     
-    fig = px.choropleth_mapbox(
+    fig = px.choropleth_map(
         scores_4326,
         geojson=scores_4326.geometry.__geo_interface__,
         locations=scores_4326.index,
         color="accessibility_score",
         color_continuous_scale=[[0, '#ef4444'], [0.3, '#f59e0b'], [0.6, '#fbbf24'], [0.85, '#a3e635'], [1, '#22c55e']],
-        mapbox_style="open-street-map",
+        map_style="open-street-map",
         center={"lat": scores_4326.geometry.centroid.y.mean(), 
                 "lon": scores_4326.geometry.centroid.x.mean()},
         zoom=10,
