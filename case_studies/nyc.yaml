@@ -58,7 +58,8 @@ data:
   local_shapefiles:
     facilities: "data/intermediate_files/Dialysis_NYC.shp"
     census_blocks: "data/intermediate_files/blocks_New_York_City_enhanced.shp"
-  population_column: "Total Popu"
+  # The enhanced shapefile already has a "population" column identical to "Total Popu".
+  population_column: "population"
   intermediate:
     path: "data/intermediate_files/"
   output:
