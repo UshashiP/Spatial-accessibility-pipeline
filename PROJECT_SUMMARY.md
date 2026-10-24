@@ -102,7 +102,8 @@ healthcare_accessibility_research/
 │       └── s3_store.py                # Parquet + GeoParquet to S3 or local outputs/
 │
 ├── dashboard/                         # ✅ Interactive Streamlit web app
-│   └── app_modern.py                  # Modern dashboard with beautiful gradient UI
+│   ├── app.py                         # CareScape dashboard (current)
+│   └── app_modern.py                  # Previous dashboard version
 │
 ├── dags/                              # Airflow DAG for scheduled pipeline runs
 │   └── accessibility_pipeline_dag.py
@@ -339,13 +340,13 @@ except S3CredentialsError:
 | **Facility Type** | Dialysis treatment centers (ESRD patients) |
 | **Catchment Radius** | 1,200 m (~15 min walk) |
 | **Census Blocks** | ~37,984 blocks |
-| **Facilities** | 154 dialysis centers |
-| **Population** | ~8.3 million residents |
+| **Facilities** | 135 dialysis centers |
+| **Population** | ~8.8 million residents |
 | **CRS** | EPSG:32618 (UTM 18N, metres) |
 | **Config** | [`case_studies/nyc.yaml`](case_studies/nyc.yaml) |
 | **Data Sources** | TIGER 2020 blocks, CMS UNOS dialysis center directory |
-| **Gini Coefficient** | 0.6555 (moderate inequality) |
-| **Zero-Access Blocks** | ~4,100 blocks (29% of population) |
+| **Gini Coefficient** | 0.7705 (high inequality) |
+| **Zero-Access Blocks** | 17,683 blocks (46.6% of blocks; 35.4% of residents) |
 | **Special Features** | Live Census API fallback when local shapefiles unavailable |
 
 **Key Insight**: Dialysis facilities cluster in Manhattan and outer outer-boroughs with connectivity challenges. NYC's diverse demographic landscape creates pockets of low accessibility despite overall network density.
@@ -402,7 +403,7 @@ blocks_New_York_City.shp              (37,984 blocks, EPSG:32618)
 blocks_Los_Angeles_urban.shp          (65,485 blocks, EPSG:2230)
 
 ICFs_DC.shp                            (114 ICF facilities, EPSG:26985)
-Dialysis_NYC.shp                       (154 dialysis centers, EPSG:32618)
+Dialysis_NYC.shp                       (135 dialysis centers, EPSG:32618)
 FQHC_LA.shp                            (630 FQHCs, EPSG:2230)
 
 blocks_Los_Angeles_enhanced.shp        (LA blocks enriched with sociodemographic columns)
@@ -564,7 +565,7 @@ ca_fqhc_accessibility.csv
 ## 9. DASHBOARD APPLICATION
 
 ### Modern Streamlit Dashboard
-**File**: `dashboard/app_modern.py`
+**File**: `dashboard/app.py`
 
 **Features**:
 1. **Beautiful Gradient UI**: Modern purple gradient theme with Inter font family
@@ -584,7 +585,7 @@ User selects city → Load pre-computed results from outputs/results/
 
 **Launch Options**:
 - **Quick Launcher**: `python launch_dashboard.py`
-- **Direct Command**: `streamlit run dashboard/app_modern.py`
+- **Direct Command**: `streamlit run dashboard/app.py`
 - **Streamlit Cloud**: Push to GitHub, connect via dashboard.streamlit.io
 - **Render.com**: Containerized deployment
 - **Docker**: `docker-compose up streamlit`
@@ -687,10 +688,10 @@ def test_write_gold_layer_creates_parquet():
 | Metric | DC | NYC | LA |
 |--------|----|----|-----|
 | **Blocks Processed** | 6,012 | 37,984 | 65,485 |
-| **Facilities Matched** | 114 | 154 | 630 |
-| **% Blocks with Access** | 80% | 71% | 88% |
-| **Gini Coefficient** | 0.8203 | 0.6555 | 0.7186 |
-| **Mean Accessibility Score** | 2.1 | 1.8 | 3.4 |
+| **Facilities Matched** | 114 | 135 | 630 |
+| **% Blocks with Access** | 80% | 53% | 88% |
+| **Gini Coefficient** | 0.8203 | 0.7705 | 0.7186 |
+| **Mean Accessibility Score** | 2.1 | 3.0 | 3.4 |
 
 ---
 
@@ -722,7 +723,7 @@ docker run --rm \
 # Run Streamlit inside container
 docker run -p 8501:8501 \
   healthcare-accessibility:latest \
-  streamlit run dashboard/app_modern.py
+  streamlit run dashboard/app.py
 ```
 
 ### Option C: Streamlit Cloud
@@ -733,7 +734,7 @@ git push origin main
 # 2. Go to https://share.streamlit.io/
 #    Connect GitHub account
 #    Select repo + branch
-#    Set app file to: dashboard/app_modern.py
+#    Set app file to: dashboard/app.py
 
 # 3. Deploy (no secrets required for pre-computed results)
 
