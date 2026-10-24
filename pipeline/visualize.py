@@ -157,7 +157,7 @@ def plot_accessibility_map(
         )
         ax.legend(loc="lower left", fontsize=9)
 
-    # Stats — population-weighted so map title matches the Lorenz curve
+    # Stats — Gini counts every block equally (matches the dashboard); the Lorenz curve is population-weighted
     pop_w   = result_gdf["population"].values.astype(float) if "population" in result_gdf.columns else None
     gini    = _gini(result_gdf[score_col].values)
     n_zero  = (result_gdf[score_col] == 0).sum()
@@ -187,7 +187,7 @@ def plot_lorenz_curve(
     config: dict | None = None,
     output_path: str | Path | None = None,
 ) -> Path:
-    """Population-weighted Lorenz curve with Gini coefficient."""
+    """Population-weighted Lorenz curve; the Gini shown counts every block equally."""
     if config is None:
         config = load_config()
 
