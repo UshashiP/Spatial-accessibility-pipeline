@@ -20,6 +20,7 @@ from branca.colormap import LinearColormap
 from pathlib import Path
 from html import escape
 from map_details import build_block_details, build_color_scale
+from official_population import apply_official_population
 
 # ── Page Configuration ────────────────────────────────────────────────────────
 st.set_page_config(
@@ -124,9 +125,9 @@ h1, h2, h3, h4 {
 
 @media (min-width: 769px) {
     [data-testid="stSidebar"] {
-        width: 260px !important;
-        min-width: 260px !important;
-        max-width: 260px !important;
+        width: 340px !important;
+        min-width: 340px !important;
+        max-width: 340px !important;
     }
 }
 
@@ -407,7 +408,7 @@ def load_scores(prefix: str) -> gpd.GeoDataFrame:
         if "accessibility_score" not in gdf.columns:
             gdf["accessibility_score"] = 0.0
         gdf["accessibility_score"] = pd.to_numeric(gdf["accessibility_score"], errors="coerce").fillna(0.0)
-        return gdf
+        return apply_official_population(gdf, prefix)
     except Exception as e:
         st.error(f"Error loading scores: {e}")
         return gpd.GeoDataFrame()
@@ -553,7 +554,7 @@ def main():
     
     # ═══ BOTTOM SECTION: Footer ═══
     st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
-    render_footer()
+    render_footer("population_model_input" in scores_gdf.columns)
 
 # ── Tab Renderers ──────────────────────────────────────────────────────────────
 def render_map_tab(scores_gdf, facilities_gdf, cfg):
@@ -962,13 +963,19 @@ def render_export_tab(scores_gdf, cfg):
             width="stretch",
         )
 
-def render_footer():
+def render_footer(official_population: bool = False):
     """Render professional footer with credits."""
-    st.markdown("""
+    population_note = (
+        "<br>Resident counts are official 2020 Census block counts. Scores were computed with a "
+        "population input in which empty blocks were set to the median block population, so a "
+        "block with no residents can still have a score."
+        if official_population else ""
+    )
+    st.markdown(f"""
     <div class='dashboard-footer'>
         <p><strong>About the analysis</strong><br>
             Spatial Distance-Weighted Two-Step Floating Catchment Area (SDW-2SFCA).
-            Euclidean distance with Gaussian decay. Data: 2020 Census blocks and CMS facility locations.
+            Euclidean distance with Gaussian decay. Data: 2020 Census blocks and CMS facility locations.{population_note}
         </p>
         <p>© 2026 CareScape &middot;
             <a href='https://github.com/UshashiP'>Ushashi Podder</a>

@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 def main():
-    dashboard_path = Path(__file__).parent / "dashboard" / "app_modern.py"
+    dashboard_path = Path(__file__).parent / "dashboard" / "app.py"
     
     if not dashboard_path.exists():
         print(f"❌ Dashboard not found at {dashboard_path}")
