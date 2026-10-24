@@ -90,6 +90,33 @@ def _ensure_crs(gdf: gpd.GeoDataFrame, expected_crs: str, label: str) -> gpd.Geo
 
 # ── Population blocks gate ────────────────────────────────────────────────────
 
+def _warn_if_population_repeats_within_block_groups(gdf: gpd.GeoDataFrame, label: str) -> None:
+    """Warn when population looks like a tract- or block-group-level value copied onto blocks.
+
+    Summing such a column across blocks counts the same residents once per block.
+    Real block counts almost never match across a whole block group.
+    """
+    geoid = gdf["GEOID"].astype(str)
+    if not (geoid.str.len() == 15).all():
+        return
+    groups = (
+        gdf.assign(_bg=geoid.str[:12], _pop=pd.to_numeric(gdf["population"], errors="coerce"))
+        .groupby("_bg")["_pop"]
+        .agg(["nunique", "size", "max"])
+    )
+    groups = groups[(groups["size"] >= 2) & (groups["max"] > 0)]
+    if len(groups) < 20:
+        return
+    repeated = (groups["nunique"] == 1).mean()
+    if repeated > 0.9:
+        log.warning(
+            "[%s] %.0f%% of block groups have an identical 'population' on every block. "
+            "This looks like a tract- or block-group-level value copied to blocks; totals will be "
+            "overcounted. Check data.population_column in the config.",
+            label, repeated * 100,
+        )
+
+
 def validate_population(
     gdf: gpd.GeoDataFrame,
     config: dict | None = None,
@@ -108,7 +135,7 @@ def validate_population(
 
     _check_required_columns(gdf, cfg_v["required_population_columns"], label)
     _check_null_pct(gdf, ["population", "GEOID"], cfg_v["max_null_pct"], label)
-
+    _warn_if_population_repeats_within_block_groups(gdf, label)
     out_of_range = gdf["population"].lt(cfg_v["min_population"]) | gdf["population"].gt(cfg_v["max_population"])
     if out_of_range.any():
         log.warning("[%s] Clamping %d blocks with population outside [%d, %d]",
