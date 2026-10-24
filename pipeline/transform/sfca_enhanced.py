@@ -1,7 +1,7 @@
 """
 pipeline.transform.sfca_enhanced
 ----------------------------------
-Enhanced Two-Step Floating Catchment Area (2SFCA) accessibility model.
+Socio-demographically weighted Two-Step Floating Catchment Area (2SFCA) accessibility model.
 
 Methodology
 -----------
