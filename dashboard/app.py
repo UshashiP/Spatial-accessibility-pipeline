@@ -19,7 +19,7 @@ from streamlit_folium import folium_static
 from branca.colormap import LinearColormap
 from pathlib import Path
 from html import escape
-from map_details import build_block_details, build_color_scale
+from map_details import block_zoom, build_block_details, build_color_scale, search_blocks
 from official_population import apply_official_population
 
 # ── Page Configuration ────────────────────────────────────────────────────────
@@ -347,11 +347,40 @@ h1, h2, h3, h4 {
     }
 }
 
+/* Blocks are clickable, so show an arrow on the map instead of MapLibre's grab hand. */
+.stPlotlyChart .maplibregl-canvas-container.maplibregl-interactive,
+.stPlotlyChart .maplibregl-canvas {
+    cursor: default;
+}
+.stPlotlyChart .maplibregl-canvas-container.maplibregl-interactive:active,
+.stPlotlyChart .maplibregl-canvas:active {
+    cursor: grabbing;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
 MAP_PALETTE = px.colors.sequential.Teal
 NO_ACCESS_COLOR = "#e8833a"
+# Keyless basemaps. "outline" and "facility" keep the selection and markers visible on each.
+BASEMAPS = {
+    "Light (CARTO Positron)": {"style": "carto-positron", "outline": "#172b3a", "facility": "#172b3a"},
+    "Streets (CARTO Voyager)": {"style": "carto-voyager", "outline": "#172b3a", "facility": "#172b3a"},
+    "Dark (CARTO Dark Matter)": {"style": "carto-darkmatter", "outline": "#ffd400", "facility": "#ffffff"},
+    "OpenStreetMap": {"style": "open-street-map", "outline": "#172b3a", "facility": "#172b3a"},
+    "Satellite (Esri)": {
+        "style": "white-bg",
+        "layers": [{
+            "below": "traces",
+            "sourcetype": "raster",
+            "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/"
+                       "World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+            "sourceattribution": "Imagery © Esri, Maxar, Earthstar Geographics",
+        }],
+        "outline": "#ffd400",
+        "facility": "#ffffff",
+    },
+}
 
 # ── Data Configuration ─────────────────────────────────────────────────────────
 CITIES = {
@@ -556,12 +585,43 @@ def main():
     st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
     render_footer("population_model_input" in scores_gdf.columns)
 
+def _clicked_geoid(point: dict) -> str | None:
+    """GEOID of a clicked choropleth block, from its location or hover customdata."""
+    if point.get("location"):
+        return str(point["location"])
+    customdata = point.get("customdata")
+    return str(customdata[0]) if customdata else None
+
+
 # ── Tab Renderers ──────────────────────────────────────────────────────────────
 def render_map_tab(scores_gdf, facilities_gdf, cfg):
     """Render interactive map visualization."""
     st.markdown("### Accessibility across the study area")
-    st.caption("Higher SDW-2SFCA score = more modeled access to nearby facilities. Hover over a block or facility for details.")
-    show_facilities = st.checkbox(
+    st.caption("Higher SDW-2SFCA score = more modeled access to nearby facilities. "
+               "Hover over a block or facility for details; click a block to outline it.")
+    prefix = cfg["prefix"]
+    search_key = f"block_search_{prefix}"
+    clicked_key = f"block_clicked_{prefix}"
+    nonce_key = f"map_nonce_{prefix}"
+    st.session_state.setdefault(nonce_key, 0)
+
+    def reset_map_selection():
+        # A new search replaces any clicked block; a fresh chart key also clears the
+        # chart's own selection so it can re-centre on the searched block.
+        st.session_state.pop(clicked_key, None)
+        st.session_state[nonce_key] += 1
+
+    search_col, basemap_col, toggle_col = st.columns([3, 1.6, 1], vertical_alignment="bottom")
+    block_query = search_col.text_input(
+        "Find a census block",
+        key=search_key,
+        on_change=reset_map_selection,
+        placeholder="15-digit block GEOID, or a tract / block-group prefix",
+        help="Enter a full census block GEOID (e.g. from the Priority Zones table or a hover "
+             "card) to zoom to it. An 11-digit tract or 12-digit block-group ID lists its blocks.",
+    )
+    basemap = BASEMAPS[basemap_col.selectbox("Basemap", list(BASEMAPS), key="map_basemap")]
+    show_facilities = toggle_col.checkbox(
         "Show facilities", value=True, key="show_facilities",
         disabled=facilities_gdf.empty,
         help="Show study facility locations and recorded supply, not real-time availability.",
@@ -583,6 +643,50 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
     map_blocks["nearest_distance_label"] = map_blocks["nearest_facility_m"].map(
         lambda distance: "Unavailable" if pd.isna(distance) else f"{distance:,.0f} m"
     )
+
+    searched_geoid = None
+    if block_query.strip():
+        search_limit = 50
+        matches = search_blocks(map_blocks["GEOID"], block_query, limit=search_limit + 1)
+        if not matches:
+            st.warning(f"No census block in this study matches '{block_query.strip()}'.")
+        elif len(matches) == 1:
+            searched_geoid = matches[0]
+        else:
+            note = (f" (first {search_limit} shown — type more digits to narrow)"
+                    if len(matches) > search_limit else "")
+            searched_geoid = st.selectbox(
+                f"Blocks starting with {''.join(c for c in block_query if c.isdigit())}{note}",
+                matches[:search_limit],
+                key=f"block_pick_{prefix}",
+                on_change=reset_map_selection,
+            )
+    clicked_geoid = st.session_state.get(clicked_key)
+    if clicked_geoid not in set(map_blocks["GEOID"]):
+        clicked_geoid = None
+    selected_geoid = clicked_geoid or searched_geoid
+    if selected_geoid is not None:
+        block = map_blocks.loc[map_blocks["GEOID"] == selected_geoid].iloc[0]
+        scores = map_blocks["accessibility_score"]
+        def clear_selection():
+            st.session_state[search_key] = ""
+            reset_map_selection()
+
+        title_col, clear_col = st.columns([4, 1], vertical_alignment="center")
+        title_col.markdown(f"**Census block {selected_geoid}**"
+                           + (" · selected on map" if clicked_geoid else ""))
+        clear_col.button("Clear selection", key=f"clear_block_{prefix}",
+                         on_click=clear_selection, width="stretch")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric(
+            "SDW-2SFCA score", f"{block['accessibility_score']:.4g}",
+            help="Share of study blocks with a lower score is shown below the value.",
+        )
+        m1.caption(f"Higher than {(scores < block['accessibility_score']).mean():.0%} of blocks")
+        m2.metric("Population", f"{block['population']:,.0f}")
+        m3.metric(f"Facilities within {cfg['catchment_m']:,} m", block["facility_count_label"])
+        m4.metric("Nearest study facility", block["nearest_distance_label"])
+
     if color_scale.capped:
         scale_summary = (
             f"Scores above 0 are colored on a 95th-percentile scale "
@@ -623,6 +727,8 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
             customdata=blocks[hover_columns].to_numpy(),
             hovertemplate=block_hover,
             marker=dict(opacity=0.75, line=dict(width=0.2, color="rgba(255,255,255,0.7)")),
+            selected=dict(marker=dict(opacity=0.75)),
+            unselected=dict(marker=dict(opacity=0.75)),
             **kwargs,
         )
 
@@ -672,7 +778,9 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
             lat=facility_points.y,
             lon=facility_points.x,
             mode="markers",
-            marker=dict(size=5, color="#172b3a", opacity=0.9),
+            marker=dict(size=5, color=basemap["facility"], opacity=0.9),
+            selected=dict(marker=dict(opacity=0.9)),
+            unselected=dict(marker=dict(opacity=0.9)),
             name="Study facilities",
             customdata=np.column_stack([names, supply_labels]),
             hovertemplate=(
@@ -683,21 +791,60 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
             ),
         ))
 
+    block_curves = list(range(len(fig.data) - (1 if show_facilities and not facilities_gdf.empty else 0)))
+    map_center = {"lat": center.y.mean(), "lon": center.x.mean()}
+    map_zoom = 10
+    if selected_geoid is not None:
+        selected = scores_4326[scores_4326["GEOID"] == selected_geoid]
+        fig.add_trace(block_trace(
+            selected,
+            z=[0],
+            colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+            showscale=False,
+            showlegend=True,
+            name="Selected block",
+        ))
+        fig.data[-1].marker.update(opacity=1, line=dict(width=3, color=basemap["outline"]))
+        fig.data[-1].update(selected=dict(marker=dict(opacity=1)),
+                            unselected=dict(marker=dict(opacity=1)))
+        block_curves.append(len(fig.data) - 1)
+    if selected_geoid is not None:
+        selected_center = center[map_blocks["GEOID"] == selected_geoid].iloc[0]
+        map_center = {"lat": selected_center.y, "lon": selected_center.x}
+        map_zoom = block_zoom(tuple(selected.total_bounds))
+
     fig.update_layout(
         map=dict(
-            style="open-street-map",
-            center={"lat": center.y.mean(), "lon": center.x.mean()},
-            zoom=10,
+            style=basemap["style"],
+            layers=basemap.get("layers", []),
+            center=map_center,
+            zoom=map_zoom,
         ),
         height=650,
         margin=dict(l=0, r=0, t=10, b=0),
         font=dict(family="Arial, sans-serif", color="#172b3a"),
         paper_bgcolor="white",
-        uirevision=cfg["prefix"],
+        # Streamlit remounts the chart whenever the figure changes, so the view is set
+        # explicitly: centred on the selected block, otherwise the whole study.
+        uirevision=f"{prefix}-{selected_geoid}",
+        clickmode="event+select",
         legend=dict(orientation="h", y=1.02, x=0),
     )
 
-    st.plotly_chart(fig)
+    chart_key = f"access_map_{prefix}_{st.session_state[nonce_key]}"
+
+    def on_block_click():
+        points = st.session_state[chart_key]["selection"]["points"]
+        geoids = [_clicked_geoid(point) for point in points
+                  if point.get("curve_number") in block_curves]
+        geoids = [g for g in geoids if g]
+        if geoids:
+            st.session_state[clicked_key] = geoids[-1]
+        elif not points:
+            # Streamlit reports an empty selection when the chart's selection is reset.
+            st.session_state.pop(clicked_key, None)
+
+    st.plotly_chart(fig, key=chart_key, on_select=on_block_click, selection_mode="points")
     with st.expander("About this map", expanded=False):
         st.markdown(
             "**Score.** The SDW-2SFCA score (Spatial Distance-Weighted Two-Step Floating "

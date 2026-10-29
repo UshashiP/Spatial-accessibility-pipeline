@@ -55,6 +55,36 @@ def build_color_scale(scores: np.ndarray, logarithmic: bool = False) -> MapColor
     return MapColorScale(values.copy(), upper, raw_ticks.tolist(), labels, capped)
 
 
+def search_blocks(geoids: pd.Series, query: str, limit: int = 50) -> list[str]:
+    """Return the block GEOID matching ``query`` exactly, else GEOIDs that start with it.
+
+    Non-digits are ignored so pasted IDs like "11001 003000 1001" still match.
+    A tract (11 digits) or block group (12 digits) prefix lists its blocks.
+    """
+    digits = "".join(ch for ch in str(query) if ch.isdigit())
+    if not digits:
+        return []
+    ids = geoids.astype(str)
+    if (ids == digits).any():
+        return [digits]
+    return sorted(ids[ids.str.startswith(digits)])[:limit]
+
+
+def block_zoom(
+    bounds: tuple[float, float, float, float],
+    target_px: float = 160.0,
+    min_zoom: float = 12.0,
+    max_zoom: float = 16.5,
+) -> float:
+    """Web-map zoom at which a lon/lat bounding box spans about ``target_px`` pixels."""
+    minx, miny, maxx, maxy = bounds
+    # Mercator stretches latitude by 1/cos(lat); compare both sides in equatorial degrees.
+    lat = np.radians((miny + maxy) / 2)
+    span = max(maxx - minx, (maxy - miny) / np.cos(lat), 1e-9)
+    # MapLibre's world is 512 px wide at zoom 0.
+    return float(np.clip(np.log2(target_px * 360 / (512 * span)), min_zoom, max_zoom))
+
+
 def build_block_details(
     blocks: gpd.GeoDataFrame,
     facilities: gpd.GeoDataFrame,
