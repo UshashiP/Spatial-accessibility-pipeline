@@ -1,0 +1,18 @@
+# Dashboard-only dependencies. Streamlit Community Cloud reads this file because
+# it sits next to the entrypoint (dashboard/app.py), so the deploy skips the
+# pipeline's heavier packages in the root requirements.txt.
+
+geopandas>=0.14.0
+shapely>=2.0.0
+pyproj>=3.6.0
+pyarrow>=15.0.0         # GeoParquet results
+
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+streamlit>=1.50.0
+streamlit-folium>=0.15.0
+folium>=0.14.0
+branca>=0.7.0
+plotly>=5.24.0          # px.choropleth_map / Scattermap (MapLibre) need 5.24+
