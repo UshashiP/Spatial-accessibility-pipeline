@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+import shapely
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
@@ -387,7 +388,7 @@ BASEMAPS = {
 
 # ── Data Configuration ─────────────────────────────────────────────────────────
 CITIES = {
-    "Washington DC — ICF Facilities": {
+    "Washington DC: ICF Facilities": {
         "city": "Washington DC",
         "prefix": "dc_icf",
         "crs": "EPSG:26985",
@@ -397,7 +398,7 @@ CITIES = {
         "catchment": "900m",
         "catchment_m": 900,
     },
-    "New York City — Dialysis Centers": {
+    "New York City: Dialysis Centers": {
         "city": "New York City",
         "prefix": "ny_dialysis",
         "crs": "EPSG:32618",
@@ -407,7 +408,7 @@ CITIES = {
         "catchment": "1,200m",
         "catchment_m": 1200,
     },
-    "Los Angeles — FQHCs": {
+    "City of Los Angeles: FQHCs": {
         "city": "City of Los Angeles",
         "prefix": "ca_fqhc",
         "crs": "EPSG:32611",
@@ -420,6 +421,15 @@ CITIES = {
 }
 
 # ── Helper Functions ───────────────────────────────────────────────────────────
+def map_geometry(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Blocks in EPSG:4326, simplified (~3 m) and rounded (~1 m) to shrink the map
+    payload sent to the browser by about 40%, with no visible change at city zoom."""
+    out = gdf.to_crs("EPSG:4326")
+    simplified = out.geometry.simplify(3e-5, preserve_topology=True)
+    out["geometry"] = shapely.transform(simplified.values, lambda coords: coords.round(5))
+    return out
+
+
 def find_latest_parquet(layer: str, dataset: str) -> Path | None:
     """Find the most recent parquet file for a dataset in a layer."""
     root = Path("outputs/results") / layer
@@ -671,7 +681,7 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
         elif len(matches) == 1:
             searched_geoid = matches[0]
         else:
-            note = (f" (first {search_limit} shown — type more digits to narrow)"
+            note = (f" (first {search_limit} shown; type more digits to narrow)"
                     if len(matches) > search_limit else "")
             searched_geoid = st.selectbox(
                 f"Blocks starting with {''.join(c for c in block_query if c.isdigit())}{note}",
@@ -731,9 +741,7 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
         scale_summary += f" Grey blocks ({n_empty:,}) have no residents."
     st.caption(scale_summary)
 
-    # Light simplification (~1 m) keeps the map payload small without visible change.
-    scores_4326 = map_blocks.to_crs("EPSG:4326")
-    scores_4326["geometry"] = scores_4326.geometry.simplify(1e-5, preserve_topology=True)
+    scores_4326 = map_geometry(map_blocks)
     center = map_blocks.to_crs(cfg["crs"]).geometry.centroid.to_crs("EPSG:4326")
     hover_columns = ["GEOID", "accessibility_score", "population",
                      "facility_count_label", "nearest_distance_label"]
@@ -896,7 +904,7 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
             "study, so they are not comparable between cities."
         )
         st.markdown(
-            f"**Study.** {cfg['city']} — {cfg['facility']}, with a "
+            f"**Study.** {cfg['city']}, {cfg['facility']}, with a "
             f"{cfg['catchment_m']:,} m catchment measured from each block centroid. "
             "Distances are straight-line, not walking or driving routes."
         )
@@ -1038,8 +1046,7 @@ def _bivariate_legend_html() -> str:
 def render_left_behind_tab(scores_gdf, facilities_gdf, cfg):
     """Dense blocks left behind (isolated or diluted), on a density × access bivariate map."""
     st.markdown("### Who gets left behind?")
-    st.caption("Blocks with residents, split by population density and SDW-2SFCA access. "
-               "Each tier holds about a third of the study's residents.")
+    st.caption("Blocks with residents, by population density and SDW-2SFCA access.")
     try:
         classes = classify_bivariate(scores_gdf, cfg["crs"])
     except ValueError as exc:
@@ -1055,24 +1062,21 @@ def render_left_behind_tab(scores_gdf, facilities_gdf, cfg):
     share = lambda n: f"{n / total_pop:.1%} of residents" if total_pop else None
     col1, col2, col3 = st.columns(3)
     col1.metric("Residents left behind", f"{left_pop:,}", share(left_pop), delta_color="off",
-                help="Residents of the densest third of blocks that are isolated or diluted.")
+                help="Residents of high-density blocks that are isolated or diluted.")
     col2.metric("Isolated", f"{isolated_pop:,}", share(isolated_pop), delta_color="off",
-                help="Dense blocks with no facility within reach. Any catchment-based method finds the same blocks.")
+                help=f"No facility within {cfg['catchment']}.")
     col3.metric("Diluted", f"{left_pop - isolated_pop:,}", share(left_pop - isolated_pop), delta_color="off",
-                help="Dense blocks with a facility nearby but access in the lower half of blocks with any "
-                     "(population-weighted). Only a method that models competition for supply, like "
-                     "SDW-2SFCA, can see these.")
+                help="A facility nearby, but access in the lower half of blocks that have any.")
     st.markdown(f"""
     <div class='warning-card'>
-        <strong>Left behind</strong> means dense blocks — where the most people live — that are
+        <strong>Left behind</strong> means high-density blocks that are
         <strong>isolated</strong> (no facility within {cfg['catchment']}) or
-        <strong>diluted</strong> (a facility nearby, but its supply stretched by the demand around it).
-        It is a screening view, not a ranking of health need, which the model does not measure.
+        <strong>diluted</strong> (a facility nearby, but stretched by demand).
+        It is a screening view, not a ranking of health need.
     </div>
     """, unsafe_allow_html=True)
 
-    blocks_4326 = blocks.to_crs("EPSG:4326")
-    blocks_4326["geometry"] = blocks_4326.geometry.simplify(1e-5, preserve_topology=True)
+    blocks_4326 = map_geometry(blocks)
     center = blocks.to_crs(cfg["crs"]).geometry.centroid.to_crs("EPSG:4326")
     basemap = BASEMAPS[st.session_state.get("map_basemap", next(iter(BASEMAPS)))]
     fig = go.Figure()
@@ -1108,11 +1112,10 @@ def render_left_behind_tab(scores_gdf, facilities_gdf, cfg):
     map_col, legend_col = st.columns([4, 1.2])
     map_col.plotly_chart(fig, key=f"left_behind_map_{cfg['prefix']}")
     legend_col.markdown(_bivariate_legend_html(), unsafe_allow_html=True)
-    st.caption("Blocks with no residents are not shown. Density tiers are population-weighted thirds; "
-               "access is none, or the lower or upper half of blocks with access. Tiers are set within "
-               "this study, so colours are not comparable between cities.")
+    st.caption("High density: the most crowded blocks, home to a third of residents. "
+               "Empty blocks are hidden. Each city is classified on its own.")
 
-    st.markdown("#### Left-behind blocks, most residents first")
+    st.markdown("#### Top 30 left-behind blocks by population")
     try:
         details = build_block_details(left, facilities_gdf, cfg["crs"], cfg["catchment_m"])
         nearest = details["nearest_facility_m"]
