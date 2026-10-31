@@ -1066,7 +1066,7 @@ def render_left_behind_tab(scores_gdf, facilities_gdf, cfg):
     col2.metric("Isolated", f"{isolated_pop:,}", share(isolated_pop), delta_color="off",
                 help=f"No facility within {cfg['catchment']}.")
     col3.metric("Diluted", f"{left_pop - isolated_pop:,}", share(left_pop - isolated_pop), delta_color="off",
-                help="A facility nearby, but access in the lower half of blocks that have any.")
+                help="A facility is nearby, but heavy demand leaves low access per person.")
     st.markdown(f"""
     <div class='warning-card'>
         <strong>Left behind</strong> means high-density blocks that are
