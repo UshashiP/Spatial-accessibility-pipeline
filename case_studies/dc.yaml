@@ -57,11 +57,13 @@ data:
   local_shapefiles:
     facilities: "data/intermediate_files/ICFs_DC.shp"
     census_blocks: "data/intermediate_files/blocksandtract_economic_final.shp"
-  # Bl_totalpo is the 2020 block count, except the 1,512 zero-population blocks are
-  # set to the median (62), so it sums to 783,289 vs 689,545 in the official
-  # 2020 counts. "Total Popu" is a tract-level value repeated on every block of
-  # the tract, so summing it overcounts (21.7M).
+  # The snapshot's Bl_totalpo set DC's 1,512 empty blocks to the median (62), so
+  # population comes from the official 2020 block counts instead (689,545).
+  # "Total Popu" is a tract-level value repeated on every block, so it overcounts.
   population_column: "Bl_totalpo"
+  population_reference: "case_studies/reference/dc_block_population_2020.csv"
+  # Blocks with no residents keep population 0: no demand, left out of statistics.
+  empty_blocks: "exclude"
   intermediate:
     path: "data/intermediate_files/"
   output:

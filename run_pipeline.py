@@ -54,6 +54,8 @@ def main(config_path: str | None = None) -> None:
     log.info("Census blocks loaded: %d rows", len(population_gdf))
 
     facility_gdf = ingest_facilities(config)
+    from pipeline.ingest.census_api import report_area_mask
+    facility_gdf["in_report_area"] = report_area_mask(facility_gdf.geometry, config).to_numpy()
     log.info("Facilities loaded: %d rows", len(facility_gdf))
 
     write_bronze_population(population_gdf, config=config)

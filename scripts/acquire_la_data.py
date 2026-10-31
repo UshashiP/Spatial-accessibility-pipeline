@@ -7,7 +7,7 @@ Run once:
     python scripts/acquire_la_data.py
 
 Outputs:
-    data/intermediate_files/FQHC_LA.shp
+    data/intermediate_files/FQHC_LA_county.shp   (every HRSA site in LA County, unclipped)
     data/intermediate_files/blocks_Los_Angeles.shp
 """
 
@@ -215,7 +215,7 @@ def _fetch_population_api(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 def main():
     # FQHCs
-    fac_path = OUT_DIR / "FQHC_LA.shp"
+    fac_path = OUT_DIR / "FQHC_LA_county.shp"
     if fac_path.exists():
         existing = gpd.read_file(fac_path)
         log.info("FQHC shapefile exists: %d facilities", len(existing))

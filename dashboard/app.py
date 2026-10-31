@@ -19,8 +19,10 @@ from streamlit_folium import folium_static
 from branca.colormap import LinearColormap
 from pathlib import Path
 from html import escape
-from map_details import block_zoom, build_block_details, build_color_scale, search_blocks
-from official_population import apply_official_population
+from map_details import (
+    BIVARIATE_COLORS, BIVARIATE_NAMED, DILUTED, ISOLATED, LEFT_BEHIND, block_zoom, build_block_details,
+    build_color_scale, classify_bivariate, populated_mask, search_blocks,
+)
 
 # ── Page Configuration ────────────────────────────────────────────────────────
 st.set_page_config(
@@ -362,6 +364,7 @@ h1, h2, h3, h4 {
 
 MAP_PALETTE = px.colors.sequential.Teal
 NO_ACCESS_COLOR = "#e8833a"
+NO_RESIDENTS_COLOR = "#dcdcdc"
 # Keyless basemaps. "outline" and "facility" keep the selection and markers visible on each.
 BASEMAPS = {
     "Light (CARTO Positron)": {"style": "carto-positron", "outline": "#172b3a", "facility": "#172b3a"},
@@ -405,7 +408,7 @@ CITIES = {
         "catchment_m": 1200,
     },
     "Los Angeles — FQHCs": {
-        "city": "Los Angeles",
+        "city": "City of Los Angeles",
         "prefix": "ca_fqhc",
         "crs": "EPSG:32611",
         "facility": "Federally Qualified Health Centers",
@@ -437,7 +440,11 @@ def load_scores(prefix: str) -> gpd.GeoDataFrame:
         if "accessibility_score" not in gdf.columns:
             gdf["accessibility_score"] = 0.0
         gdf["accessibility_score"] = pd.to_numeric(gdf["accessibility_score"], errors="coerce").fillna(0.0)
-        return apply_official_population(gdf, prefix)
+        # Blocks outside the reporting area (e.g. LA County around the City of LA)
+        # are modelled but not reported.
+        if "in_report_area" in gdf:
+            gdf = gdf[gdf["in_report_area"].fillna(False).astype(bool)]
+        return gdf
     except Exception as e:
         st.error(f"Error loading scores: {e}")
         return gpd.GeoDataFrame()
@@ -450,7 +457,11 @@ def load_facilities(prefix: str) -> gpd.GeoDataFrame:
         if not path:
             st.warning(f"No facility files found for {prefix}")
             return gpd.GeoDataFrame()
-        return gpd.read_parquet(path)
+        facilities = gpd.read_parquet(path)
+        # Show the sites inside the reporting area; the model used them all.
+        if "in_report_area" in facilities:
+            facilities = facilities[facilities["in_report_area"].fillna(False).astype(bool)]
+        return facilities
     except Exception as e:
         st.warning(f"Could not load facilities: {e}")
         return gpd.GeoDataFrame()
@@ -463,15 +474,14 @@ def compute_gini(scores: np.ndarray) -> float:
         return 0.0
     return float((2 * np.sum(np.arange(1, n + 1) * x)) / (n * x.sum()) - (n + 1) / n)
 
-def create_lorenz_data(scores: np.ndarray, population: np.ndarray):
-    """Generate Lorenz curve coordinates."""
-    order = np.argsort(scores)
-    s, p = scores[order], population[order].astype(float)
-    cum_p = np.cumsum(p) / p.sum()
-    cum_a = np.cumsum(s * p)
+def create_lorenz_data(scores: np.ndarray):
+    """Lorenz curve with each block counted equally, so its area matches compute_gini."""
+    s = np.sort(scores.astype(float))
+    cum_b = np.arange(1, len(s) + 1) / len(s)
+    cum_a = np.cumsum(s)
     if cum_a[-1] > 0:
         cum_a = cum_a / cum_a[-1]
-    return np.concatenate([[0], cum_p]), np.concatenate([[0], cum_a])
+    return np.concatenate([[0], cum_b]), np.concatenate([[0], cum_a])
 
 # ── Main Application ───────────────────────────────────────────────────────────
 def main():
@@ -522,18 +532,22 @@ def main():
         st.error("❌ Could not load data. Please check file paths.")
         return
     
-    # Compute Statistics
-    scores = scores_gdf["accessibility_score"].values
-    population = scores_gdf["population"].values
+    # Compute Statistics (blocks with residents only; empty blocks have no one to serve)
+    populated_gdf = scores_gdf[populated_mask(scores_gdf)]
+    n_empty = len(scores_gdf) - len(populated_gdf)
+    scores = populated_gdf["accessibility_score"].values
     gini = compute_gini(scores)
-    
+
     zero_access_pct = (scores == 0).mean() * 100
-    zero_access_pop = int(scores_gdf.loc[scores == 0, "population"].sum())
-    total_pop = int(scores_gdf["population"].sum())
+    zero_access_pop = int(populated_gdf.loc[scores == 0, "population"].sum())
+    total_pop = int(populated_gdf["population"].sum())
     zero_access_pop_pct = zero_access_pop / total_pop * 100 if total_pop else 0.0
-    
+
     # ═══ Quick Stats Bar ═══
-    st.caption(f"STUDY OVERVIEW / {city_key} · {len(scores_gdf):,} census blocks")
+    st.caption(
+        f"STUDY OVERVIEW / {city_key} · {len(populated_gdf):,} census blocks with residents"
+        + (f" · {n_empty:,} blocks with no residents excluded" if n_empty else "")
+    )
     col1, col2, col3, col4 = st.columns(4)
     col1.metric(
         "Residents with no access",
@@ -546,13 +560,14 @@ def main():
     col2.metric(
         "Blocks with no access",
         f"{zero_access_pct:.1f}%",
-        help="Share of census blocks with a zero accessibility score.",
+        help="Share of census blocks with residents that have a zero accessibility score.",
     )
     col3.metric("Facilities", f"{len(facilities_gdf):,}", help="Number of facilities in the selected study.")
     col4.metric(
         "Gini index",
         f"{gini:.3f}",
-        help="Inequality across block accessibility scores. Closer to 0 means more equal; closer to 1 means more unequal.",
+        help="Inequality across the accessibility scores of blocks with residents. "
+             "Closer to 0 means more equal; closer to 1 means more unequal.",
     )
     if total_pop:
         st.markdown(
@@ -567,23 +582,23 @@ def main():
         )
     
     # ═══ BODY SECTION: Main Content ═══
-    tab1, tab2, tab3, tab4 = st.tabs(["Access map", "Inequality", "Priority areas", "Export data"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Access map", "Inequality", "Left behind", "Export data"])
     
     with tab1:
         render_map_tab(scores_gdf, facilities_gdf, cfg)
     
     with tab2:
-        render_inequality_tab(scores_gdf, gini)
-    
+        render_inequality_tab(populated_gdf, gini)
+
     with tab3:
-        render_priority_tab(scores_gdf, cfg)
+        render_left_behind_tab(populated_gdf, facilities_gdf, cfg)
     
     with tab4:
         render_export_tab(scores_gdf, cfg)
     
     # ═══ BOTTOM SECTION: Footer ═══
     st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
-    render_footer("population_model_input" in scores_gdf.columns)
+    render_footer()
 
 def _clicked_geoid(point: dict) -> str | None:
     """GEOID of a clicked choropleth block, from its location or hover customdata."""
@@ -617,7 +632,7 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
         key=search_key,
         on_change=reset_map_selection,
         placeholder="15-digit block GEOID, or a tract / block-group prefix",
-        help="Enter a full census block GEOID (e.g. from the Priority Zones table or a hover "
+        help="Enter a full census block GEOID (e.g. from the Left behind table or a hover "
              "card) to zoom to it. An 11-digit tract or 12-digit block-group ID lists its blocks.",
     )
     basemap = BASEMAPS[basemap_col.selectbox("Basemap", list(BASEMAPS), key="map_basemap")]
@@ -633,7 +648,10 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
         map_blocks = build_block_details(
             scores_gdf, facilities_gdf, cfg["crs"], cfg["catchment_m"]
         )
-        color_scale = build_color_scale(map_blocks["accessibility_score"].to_numpy())
+        map_blocks["populated"] = populated_mask(map_blocks)
+        color_scale = build_color_scale(
+            map_blocks.loc[map_blocks["populated"], "accessibility_score"].to_numpy()
+        )
     except ValueError as exc:
         st.error(f"Cannot prepare block map details: {exc}")
         return
@@ -667,7 +685,7 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
     selected_geoid = clicked_geoid or searched_geoid
     if selected_geoid is not None:
         block = map_blocks.loc[map_blocks["GEOID"] == selected_geoid].iloc[0]
-        scores = map_blocks["accessibility_score"]
+        scores = map_blocks.loc[map_blocks["populated"], "accessibility_score"]
         def clear_selection():
             st.session_state[search_key] = ""
             reset_map_selection()
@@ -682,7 +700,11 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
             "SDW-2SFCA score", f"{block['accessibility_score']:.4g}",
             help="Share of study blocks with a lower score is shown below the value.",
         )
-        m1.caption(f"Higher than {(scores < block['accessibility_score']).mean():.0%} of blocks")
+        if block["populated"]:
+            m1.caption(f"Higher than {(scores < block['accessibility_score']).mean():.0%} "
+                       "of blocks with residents")
+        else:
+            m1.caption("No residents · not counted in study statistics")
         m2.metric("Population", f"{block['population']:,.0f}")
         m3.metric(f"Facilities within {cfg['catchment_m']:,} m", block["facility_count_label"])
         m4.metric("Nearest study facility", block["nearest_distance_label"])
@@ -692,8 +714,9 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
             f"Scores above 0 are colored on a 95th-percentile scale "
             f"(cap {color_scale.upper:,.5g}+). Blocks with no access are shown in orange."
         )
+        scale_basis = "the 95th percentile of blocks with residents"
         scale_explanation = (
-            f"Colors span 0–{color_scale.upper:,.5g} (the study's 95th percentile). "
+            f"Colors span 0–{color_scale.upper:,.5g} ({scale_basis}). "
             f"Scores at or above {color_scale.upper:,.5g} share the highest color, "
             "marked + on the legend. Hover cards retain the actual score."
         )
@@ -703,6 +726,9 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
             "The 95th-percentile scale uses the full range because the cutoff is zero "
             "or no scores exceed it."
         )
+    n_empty = int((~map_blocks["populated"]).sum())
+    if n_empty:
+        scale_summary += f" Grey blocks ({n_empty:,}) have no residents."
     st.caption(scale_summary)
 
     # Light simplification (~1 m) keeps the map payload small without visible change.
@@ -733,7 +759,19 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
         )
 
     fig = go.Figure()
-    no_access = scores_4326["accessibility_score"] == 0
+    # Empty blocks are scored like any other but have no one to serve, so they are
+    # drawn grey rather than as no access or as well served.
+    populated = scores_4326["populated"]
+    if (~populated).any():
+        fig.add_trace(block_trace(
+            scores_4326[~populated],
+            z=np.zeros(int((~populated).sum())),
+            colorscale=[[0, NO_RESIDENTS_COLOR], [1, NO_RESIDENTS_COLOR]],
+            showscale=False,
+            showlegend=True,
+            name="No residents",
+        ))
+    no_access = populated & (scores_4326["accessibility_score"] == 0)
     if no_access.any():
         fig.add_trace(block_trace(
             scores_4326[no_access],
@@ -743,7 +781,7 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
             showlegend=True,
             name="No access (score 0)",
         ))
-    has_access = ~no_access
+    has_access = populated & ~no_access
     if has_access.any():
         fig.add_trace(block_trace(
             scores_4326[has_access],
@@ -852,9 +890,10 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
             "Higher means more modeled access; it is not a facility count or percentage."
         )
         st.markdown(
-            f"**Colors.** {scale_explanation} Orange blocks have no modeled access "
-            "(score 0). Colors are scaled within each study, so they are not comparable "
-            "between cities."
+            f"**Colors.** {scale_explanation} Orange blocks have residents but no modeled "
+            "access (score 0). Grey blocks have no residents; the model still scores them, "
+            "but they are left out of the study statistics. Colors are scaled within each "
+            "study, so they are not comparable between cities."
         )
         st.markdown(
             f"**Study.** {cfg['city']} — {cfg['facility']}, with a "
@@ -872,10 +911,9 @@ def render_inequality_tab(scores_gdf, gini):
     st.markdown("### How evenly is access distributed?")
     
     scores = scores_gdf["accessibility_score"].values
-    population = scores_gdf["population"].values
-    
+
     # Lorenz Curve
-    cum_p, cum_a = create_lorenz_data(scores, population)
+    cum_b, cum_a = create_lorenz_data(scores)
     
     fig = go.Figure()
     
@@ -889,7 +927,7 @@ def render_inequality_tab(scores_gdf, gini):
     
     # Actual distribution
     fig.add_trace(go.Scatter(
-        x=cum_p, y=cum_a,
+        x=cum_b, y=cum_a,
         mode='lines',
         line=dict(color='#087f78', width=3),
         fill='tonexty',
@@ -899,12 +937,12 @@ def render_inequality_tab(scores_gdf, gini):
     
     fig.update_layout(
         title=dict(
-            text="<b>Lorenz curve (blocks weighted by population)</b>",
+            text=f"<b>Lorenz curve · Gini {gini:.4f}</b>",
             font=dict(size=18, color="#374151"),
             x=0.5,
             xanchor="center"
         ),
-        xaxis_title="Cumulative Share of Population",
+        xaxis_title="Cumulative Share of Census Blocks with Residents",
         yaxis_title="Cumulative Share of Accessibility",
         height=600,
         font=dict(family="Arial, sans-serif", color="#172b3a"),
@@ -918,9 +956,9 @@ def render_inequality_tab(scores_gdf, gini):
     <div class='info-card'>
         <strong>Understanding the index</strong><br>
         The Gini coefficient is <strong>{gini:.4f}</strong>, calculated across census blocks
-        with each block counted equally. The Lorenz curve above weights blocks by population,
-        so its shape can differ from the index.
-        A value closer to 0 indicates more equal access distribution, 
+        with residents, each block counted equally. It is the area between the curve above
+        and the line of perfect equality, doubled.
+        A value closer to 0 indicates more equal access distribution,
         while closer to 1 indicates high inequality.
     </div>
     """, unsafe_allow_html=True)
@@ -957,92 +995,141 @@ def render_inequality_tab(scores_gdf, gini):
     
     st.plotly_chart(fig_hist)
     st.caption(
-        f"Shows the {len(shown):,} blocks scoring above 0 up to {cap:,.5g} "
+        f"Shows the {len(shown):,} blocks with residents scoring above 0 up to {cap:,.5g} "
         f"(the 95th percentile). Not shown: {zero_blocks:,} blocks with a score of 0 "
         f"({zero_blocks / len(scores):.0%}) and {above_cap:,} blocks above {cap:,.5g}."
     )
 
-def render_priority_tab(scores_gdf, cfg):
-    """Render priority zones identification."""
-    st.markdown("### Where does low access affect the most people?")
-    
-    pop_median = scores_gdf["population"].median()
-    score_median = scores_gdf["accessibility_score"].median()
-    
-    priority = scores_gdf[
-        (scores_gdf["population"] > pop_median) &
-        (scores_gdf["accessibility_score"] < score_median)
-    ].sort_values("population", ascending=False)
-    
-    n_priority = len(priority)
-    pop_affected = int(priority["population"].sum())
-    
-    # Priority Metrics
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.metric(
-            label="Priority blocks",
-            value=f"{n_priority:,}",
-            help="Blocks with above-median population and below-median accessibility score.",
-        )
-    
-    with col2:
-        st.metric(
-            label="Residents in priority blocks",
-            value=f"{pop_affected:,}",
-            help="Total population of the priority blocks.",
-        )
-    
-    st.markdown("""
+_TIER_WORDS = {"low": "Low", "medium": "Medium", "high": "High"}
+
+
+def _bivariate_label(key: str) -> str:
+    """Display name for a density_access class, using the cell names where set."""
+    if key in BIVARIATE_NAMED:
+        name, description = BIVARIATE_NAMED[key]
+        return f"{name} ({description.lower()})"
+    density, access = key.split("_")
+    return f"{_TIER_WORDS[density]} density · {access} access"
+
+
+def _bivariate_legend_html() -> str:
+    """3x3 colour grid (access up, density across) plus the named cells."""
+    cells = "".join(
+        f"<div style='background:{BIVARIATE_COLORS[f'{d}_{a}']};aspect-ratio:1'></div>"
+        for a in ("high", "medium", "low") for d in ("low", "medium", "high")
+    )
+    corners = "".join(
+        f"<div style='display:flex;gap:.5rem;align-items:flex-start;margin-top:.45rem'>"
+        f"<span style='flex:none;width:.9rem;height:.9rem;margin-top:.15rem;"
+        f"background:{BIVARIATE_COLORS[key]};border:1px solid #9aa5b1'></span>"
+        f"<span><strong>{name}</strong><br><span style='color:#526779'>{description}</span></span></div>"
+        for key, (name, description) in BIVARIATE_NAMED.items()
+    )
+    return (
+        "<div style='font-size:.85rem;line-height:1.3'>"
+        "<div style='display:grid;grid-template-columns:auto 1fr;gap:.35rem;align-items:center'>"
+        "<div style='writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600'>Access →</div>"
+        f"<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:2px;max-width:9rem'>{cells}</div>"
+        "<div></div><div style='font-weight:600'>Density →</div></div>"
+        f"{corners}</div>"
+    )
+
+
+def render_left_behind_tab(scores_gdf, facilities_gdf, cfg):
+    """Dense blocks left behind (isolated or diluted), on a density × access bivariate map."""
+    st.markdown("### Who gets left behind?")
+    st.caption("Blocks with residents, split by population density and SDW-2SFCA access. "
+               "Each tier holds about a third of the study's residents.")
+    try:
+        classes = classify_bivariate(scores_gdf, cfg["crs"])
+    except ValueError as exc:
+        st.error(f"Cannot classify blocks: {exc}")
+        return
+    blocks = scores_gdf.loc[classes.index].join(classes)
+    left = blocks[blocks["bivariate_class"].isin(LEFT_BEHIND)]
+    isolated = left["bivariate_class"] == ISOLATED
+
+    total_pop = int(blocks["population"].sum())
+    left_pop = int(left["population"].sum())
+    isolated_pop = int(left.loc[isolated, "population"].sum())
+    share = lambda n: f"{n / total_pop:.1%} of residents" if total_pop else None
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Residents left behind", f"{left_pop:,}", share(left_pop), delta_color="off",
+                help="Residents of the densest third of blocks that are isolated or diluted.")
+    col2.metric("Isolated", f"{isolated_pop:,}", share(isolated_pop), delta_color="off",
+                help="Dense blocks with no facility within reach. Any catchment-based method finds the same blocks.")
+    col3.metric("Diluted", f"{left_pop - isolated_pop:,}", share(left_pop - isolated_pop), delta_color="off",
+                help="Dense blocks with a facility nearby but access in the lower half of blocks with any "
+                     "(population-weighted). Only a method that models competition for supply, like "
+                     "SDW-2SFCA, can see these.")
+    st.markdown(f"""
     <div class='warning-card'>
-        <strong>Screening rule:</strong> priority blocks have above-median population and
-        below-median accessibility score. It is a simple way to find where low access affects
-        many residents, and a starting point for review rather than a funding recommendation.
+        <strong>Left behind</strong> means dense blocks — where the most people live — that are
+        <strong>isolated</strong> (no facility within {cfg['catchment']}) or
+        <strong>diluted</strong> (a facility nearby, but its supply stretched by the demand around it).
+        It is a screening view, not a ranking of health need, which the model does not measure.
     </div>
     """, unsafe_allow_html=True)
-    
-    # Comparison visualization
+
+    blocks_4326 = blocks.to_crs("EPSG:4326")
+    blocks_4326["geometry"] = blocks_4326.geometry.simplify(1e-5, preserve_topology=True)
+    center = blocks.to_crs(cfg["crs"]).geometry.centroid.to_crs("EPSG:4326")
+    basemap = BASEMAPS[st.session_state.get("map_basemap", next(iter(BASEMAPS)))]
     fig = go.Figure()
-    
-    fig.add_trace(go.Histogram(
-        x=scores_gdf["accessibility_score"],
-        nbinsx=50,
-        name="All Blocks",
-        marker=dict(color='#087f78', opacity=0.7)
-    ))
-    
-    fig.add_trace(go.Histogram(
-        x=priority["accessibility_score"],
-        nbinsx=50,
-        name="Priority Blocks",
-        marker=dict(color='#ef4444', opacity=0.8)
-    ))
-    
+    for key, colour in BIVARIATE_COLORS.items():
+        subset = blocks_4326[blocks_4326["bivariate_class"] == key]
+        if subset.empty:
+            continue
+        label = _bivariate_label(key)
+        fig.add_trace(go.Choroplethmap(
+            geojson=subset[["GEOID", "geometry"]].__geo_interface__,
+            featureidkey="properties.GEOID",
+            locations=subset["GEOID"],
+            z=np.zeros(len(subset)),
+            colorscale=[[0, colour], [1, colour]],
+            showscale=False,
+            name=label,
+            customdata=subset[["GEOID", "population", "density", "accessibility_score"]].to_numpy(),
+            hovertemplate=(
+                "<b>Census block %{customdata[0]}</b><br>"
+                f"{label}<br>"
+                "Population: %{customdata[1]:,}<br>"
+                "Residents per km²: %{customdata[2]:,.0f}<br>"
+                "SDW-2SFCA score: %{customdata[3]:.4g}<extra></extra>"
+            ),
+            marker=dict(opacity=0.85, line=dict(width=0.2, color="rgba(255,255,255,0.7)")),
+        ))
     fig.update_layout(
-        title="Accessibility Score Distribution Comparison",
-        xaxis_title="Accessibility Score",
-        yaxis_title="Number of Census Blocks",
-        barmode='overlay',
-        height=400,
-        font=dict(family="Arial, sans-serif", color="#172b3a"),
-        plot_bgcolor='#fafafa',
-        paper_bgcolor='white',
+        map=dict(style=basemap["style"], layers=basemap.get("layers", []),
+                 center={"lat": center.y.mean(), "lon": center.x.mean()}, zoom=10),
+        height=600, margin=dict(l=0, r=0, t=10, b=0), showlegend=False,
+        font=dict(family="Arial, sans-serif", color="#172b3a"), paper_bgcolor="white",
     )
-    
-    st.plotly_chart(fig)
-    
-    # Top priority blocks table
-    st.markdown("#### Top 30 priority census blocks")
-    
-    priority_table = priority[["GEOID", "population", "accessibility_score"]].copy()
-    priority_table.columns = ["Census Block GEOID", "Population", "Accessibility Score"]
-    
-    st.dataframe(priority_table.head(30), height=400)
+    map_col, legend_col = st.columns([4, 1.2])
+    map_col.plotly_chart(fig, key=f"left_behind_map_{cfg['prefix']}")
+    legend_col.markdown(_bivariate_legend_html(), unsafe_allow_html=True)
+    st.caption("Blocks with no residents are not shown. Density tiers are population-weighted thirds; "
+               "access is none, or the lower or upper half of blocks with access. Tiers are set within "
+               "this study, so colours are not comparable between cities.")
+
+    st.markdown("#### Left-behind blocks, most residents first")
+    try:
+        details = build_block_details(left, facilities_gdf, cfg["crs"], cfg["catchment_m"])
+        nearest = details["nearest_facility_m"]
+    except ValueError:
+        nearest = pd.Series(np.nan, index=left.index)
+    table = pd.DataFrame({
+        "Census Block GEOID": left["GEOID"].astype(str),
+        "Pathway": np.where(isolated, "Isolated", "Diluted"),
+        "Population": left["population"].astype(int),
+        "Residents per km²": left["density"].round(0).astype(int),
+        "Nearest study facility (m)": nearest.round(0),
+    }).sort_values("Population", ascending=False)
+    st.dataframe(table.head(30), height=400, hide_index=True)
     st.download_button(
-        label=f"Download all {n_priority:,} priority blocks (CSV)",
-        data=priority_table.to_csv(index=False),
-        file_name=f"{cfg['prefix']}_priority_blocks.csv",
+        label=f"Download all {len(table):,} left-behind blocks (CSV)",
+        data=table.to_csv(index=False),
+        file_name=f"{cfg['prefix']}_left_behind_blocks.csv",
         mime="text/csv",
     )
 
@@ -1110,19 +1197,14 @@ def render_export_tab(scores_gdf, cfg):
             width="stretch",
         )
 
-def render_footer(official_population: bool = False):
+def render_footer():
     """Render professional footer with credits."""
-    population_note = (
-        "<br>Resident counts are official 2020 Census block counts. Scores were computed with a "
-        "population input in which empty blocks were set to the median block population, so a "
-        "block with no residents can still have a score."
-        if official_population else ""
-    )
     st.markdown(f"""
     <div class='dashboard-footer'>
         <p><strong>About the analysis</strong><br>
             Spatial Distance-Weighted Two-Step Floating Catchment Area (SDW-2SFCA).
-            Euclidean distance with Gaussian decay. Data: 2020 Census blocks and CMS facility locations.{population_note}
+            Euclidean distance with Gaussian decay. Data: 2020 Census blocks and CMS facility locations.
+            Blocks with no residents are shown grey and left out of the statistics.
         </p>
         <p>© 2026 CareScape &middot;
             <a href='https://github.com/UshashiP'>Ushashi Podder</a>

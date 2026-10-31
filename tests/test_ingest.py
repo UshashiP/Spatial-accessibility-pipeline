@@ -148,3 +148,74 @@ class TestCMSIngest:
         gdf = ingest_facilities(pipeline_config)
         assert gdf.crs is not None
         assert gdf.crs.is_projected
+
+
+# ── Population settings ───────────────────────────────────────────────────────
+
+class TestPopulationSettings:
+    """Tests for pipeline.ingest.census_api._apply_population_settings"""
+
+    @pytest.fixture
+    def blocks(self):
+        return gpd.GeoDataFrame(
+            {"GEOID": ["1", "2", "3", "4"], "population": [0, 10, 30, 0]},
+            geometry=[Point(0, 0)] * 4, crs="EPSG:26985",
+        )
+
+    def test_exclude_keeps_empty_blocks_at_zero(self, blocks):
+        from pipeline.ingest.census_api import _apply_population_settings
+        result = _apply_population_settings(blocks, {"data": {}})
+        assert result["population"].tolist() == [0, 10, 30, 0]
+
+    def test_median_fills_empty_blocks(self, blocks):
+        from pipeline.ingest.census_api import _apply_population_settings
+        result = _apply_population_settings(blocks, {"data": {"empty_blocks": "median"}})
+        assert result["population"].tolist() == [5, 10, 30, 5]
+
+    def test_reference_replaces_population(self, blocks, tmp_path):
+        from pipeline.ingest.census_api import _apply_population_settings
+        path = tmp_path / "ref.csv"
+        path.write_text("GEOID,population_2020\n1,7\n2,0\n3,30\n4,0\n")
+        result = _apply_population_settings(blocks, {"data": {"population_reference": str(path)}})
+        assert result["population"].tolist() == [7, 0, 30, 0]
+
+    def test_reference_must_cover_every_block(self, blocks, tmp_path):
+        from pipeline.ingest.census_api import _apply_population_settings
+        path = tmp_path / "ref.csv"
+        path.write_text("GEOID,population_2020\n1,7\n")
+        with pytest.raises(ValueError, match="3 missing"):
+            _apply_population_settings(blocks, {"data": {"population_reference": str(path)}})
+
+    def test_unknown_mode_rejected(self, blocks):
+        from pipeline.ingest.census_api import _apply_population_settings
+        with pytest.raises(ValueError, match="empty_blocks"):
+            _apply_population_settings(blocks, {"data": {"empty_blocks": "drop"}})
+
+
+class TestReportArea:
+    """Tests for pipeline.ingest.census_api.report_area_mask"""
+
+    def test_no_report_area_keeps_everything(self):
+        from pipeline.ingest.census_api import report_area_mask
+        points = gpd.GeoSeries([Point(0, 0), Point(10, 10)], crs="EPSG:32611")
+        assert report_area_mask(points, {"study_area": {}}).tolist() == [True, True]
+
+    def test_flags_geometries_inside_the_boundary(self, tmp_path):
+        from shapely.geometry import box
+        from pipeline.ingest.census_api import report_area_mask
+        boundary = tmp_path / "places.geojson"
+        gpd.GeoDataFrame({"GEOID": ["0644000", "0600001"]},
+                         geometry=[box(0, 0, 100, 100), box(200, 0, 300, 100)],
+                         crs="EPSG:32611").to_file(boundary)
+        points = gpd.GeoSeries([Point(50, 50), Point(250, 50), Point(500, 500)], crs="EPSG:32611")
+        config = {"study_area": {"report_area": {"boundary": str(boundary), "id": "0644000"}}}
+        assert report_area_mask(points, config).tolist() == [True, False, False]
+
+    def test_unknown_id_is_an_error(self, tmp_path):
+        from shapely.geometry import box
+        from pipeline.ingest.census_api import report_area_mask
+        boundary = tmp_path / "places.geojson"
+        gpd.GeoDataFrame({"GEOID": ["0644000"]}, geometry=[box(0, 0, 1, 1)], crs="EPSG:32611").to_file(boundary)
+        config = {"study_area": {"report_area": {"boundary": str(boundary), "id": "9999999"}}}
+        with pytest.raises(ValueError, match="found 0"):
+            report_area_mask(gpd.GeoSeries([Point(0, 0)], crs="EPSG:32611"), config)

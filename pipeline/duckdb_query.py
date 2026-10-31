@@ -96,6 +96,10 @@ def build_analytics_db(
         SELECT * FROM read_parquet('{gold_path}');
     """)
 
+    # Statistics cover blocks with residents inside the reporting area, if one is flagged.
+    columns = {row[0] for row in con.execute(f"DESCRIBE {table_name}").fetchall()}
+    reported = "population > 0" + (" AND in_report_area" if "in_report_area" in columns else "")
+
     # Attach metadata for provenance
     con.execute(f"""
         CREATE OR REPLACE VIEW v_run_metadata AS
@@ -117,7 +121,7 @@ def build_analytics_db(
         CREATE OR REPLACE VIEW v_zero_access AS
         SELECT GEOID, population, accessibility_score
         FROM {table_name}
-        WHERE accessibility_score = 0
+        WHERE accessibility_score = 0 AND {reported}
         ORDER BY population DESC;
     """)
 
@@ -139,7 +143,9 @@ def build_analytics_db(
             SUM(CASE WHEN accessibility_score = 0
                      THEN population ELSE 0 END) * 1.0
                 / NULLIF(SUM(population), 0)                AS pct_pop_no_access
-        FROM {table_name};
+        FROM {table_name}
+        -- Blocks with no residents are scored but have no one to serve.
+        WHERE {reported};
     """)
 
     row_count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]

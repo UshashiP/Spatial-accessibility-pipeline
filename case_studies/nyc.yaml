@@ -57,9 +57,12 @@ data:
     use_snapshot: true
   local_shapefiles:
     facilities: "data/intermediate_files/Dialysis_NYC.shp"
-    census_blocks: "data/intermediate_files/blocks_New_York_City_enhanced.shp"
-  # The enhanced shapefile already has a "population" column identical to "Total Popu".
+    # All NYC blocks with ACS income, insurance and age columns apportioned from
+    # tracts by block population, as for DC; built by scripts/acquire_acs.py.
+    census_blocks: "data/intermediate_files/blocks_New_York_City_dc_method.shp"
   population_column: "population"
+  # Blocks with no residents keep population 0: no demand, left out of statistics.
+  empty_blocks: "exclude"
   intermediate:
     path: "data/intermediate_files/"
   output:

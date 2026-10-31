@@ -1,7 +1,9 @@
 """
-Healthcare Access Intelligence Dashboard - Modern Streamlit Version
---------------------------------------------------------------------
-Beautiful, intuitive interface for SDW-2SFCA analysis
+LEGACY — superseded by dashboard/app.py (run via launch_dashboard.py).
+
+Kept for reference only and no longer maintained: its statistics include
+blocks with no residents and its priority rule differs from app.py, so its
+numbers do not match the README or the published figures.
 
 Run: streamlit run dashboard/app_modern.py
 """

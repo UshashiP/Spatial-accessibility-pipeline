@@ -34,3 +34,7 @@ outputs/results/bronze/
 # Logs
 logs/
 *.log
+
+# OS and editor files
+.DS_Store
+.vscode/
