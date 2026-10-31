@@ -102,14 +102,17 @@ FEMALE_18_64     = ["B01001_031E","B01001_032E","B01001_033E","B01001_034E",
                     "B01001_043E"]
 
 
-def fetch_acs_county(county_fips: str, county_name: str, api_key: str) -> pd.DataFrame:
-    """Fetch ACS tract-level data for one NYC county."""
+def fetch_acs_county(
+    county_fips: str, county_name: str, api_key: str | None, state_fips: str = "36",
+) -> pd.DataFrame:
+    """Fetch ACS tract-level data for one county (NYC by default)."""
     params = {
         "get":  ",".join(ACS_VARS),
         "for":  "tract:*",
-        "in":   f"state:36 county:{county_fips}",
-        "key":  api_key,
+        "in":   f"state:{state_fips} county:{county_fips}",
     }
+    if api_key:
+        params["key"] = api_key
     resp = requests.get(ACS_URL, params=params, timeout=90)
     resp.raise_for_status()
 

@@ -319,14 +319,14 @@ except S3CredentialsError:
 | **Study Area** | Washington, DC (city limits) |
 | **Facility Type** | Intermediate Care Facilities / IID (skilled nursing) |
 | **Catchment Radius** | 900 m (~10 min walk) |
-| **Census Blocks** | ~6,012 blocks |
+| **Census Blocks** | 6,012 blocks (4,500 with residents) |
 | **Facilities** | 114 ICF/IID facilities |
 | **Population** | ~620,000 residents |
 | **CRS** | EPSG:26985 (Maryland State Plane NAD83, metres) |
 | **Config** | [`case_studies/dc.yaml`](case_studies/dc.yaml) |
 | **Data Sources** | TIGER 2020 blocks, CMS HCQIS provider directory |
-| **Gini Coefficient** | 0.8203 (highly unequal distribution) |
-| **Zero-Access Blocks** | ~1,200 blocks (20% of population) |
+| **Gini Coefficient** | 0.799 (blocks with residents) |
+| **Zero-Access Blocks** | 1,377 blocks (30.6% of blocks with residents; 35.9% of residents) |
 
 **Key Insight**: Large geographical disparities with outer wards (SE/NE) having significantly lower ICF accessibility, exacerbated by sociodemographic factors (lower income, higher uninsured rates).
 
@@ -339,37 +339,37 @@ except S3CredentialsError:
 | **Study Area** | New York City (5 boroughs) |
 | **Facility Type** | Dialysis treatment centers (ESRD patients) |
 | **Catchment Radius** | 1,200 m (~15 min walk) |
-| **Census Blocks** | ~37,984 blocks |
+| **Census Blocks** | 37,984 blocks (30,696 with residents) |
 | **Facilities** | 135 dialysis centers |
 | **Population** | ~8.8 million residents |
 | **CRS** | EPSG:32618 (UTM 18N, metres) |
 | **Config** | [`case_studies/nyc.yaml`](case_studies/nyc.yaml) |
 | **Data Sources** | TIGER 2020 blocks, CMS UNOS dialysis center directory |
-| **Gini Coefficient** | 0.7705 (high inequality) |
-| **Zero-Access Blocks** | 17,683 blocks (46.6% of blocks; 35.4% of residents) |
+| **Gini Coefficient** | 0.820 (blocks with residents) |
+| **Zero-Access Blocks** | 14,146 blocks (46.1% of blocks with residents; 35.4% of residents) |
 | **Special Features** | Live Census API fallback when local shapefiles unavailable |
 
 **Key Insight**: Dialysis facilities cluster in Manhattan and outer outer-boroughs with connectivity challenges. NYC's diverse demographic landscape creates pockets of low accessibility despite overall network density.
 
 ---
 
-#### **Case Study 3: Los Angeles — Federally Qualified Health Centers (FQHC)**
+#### **Case Study 3: City of Los Angeles — Federally Qualified Health Centers (FQHC)**
 
 | Parameter | Value |
 |-----------|-------|
-| **Study Area** | Los Angeles County (urban core) |
+| **Study Area** | City of Los Angeles (reported); modelled on all of mainland LA County |
 | **Facility Type** | Federally Qualified Health Centers (FQHC, primary care) |
-| **Catchment Radius** | 1,600 m (~20 min walk) |
-| **Census Blocks** | ~65,485 blocks |
-| **Facilities** | 630 FQHCs |
-| **Population** | ~13 million residents |
-| **CRS** | EPSG:2230 (California State Plane NAD83, metres) |
+| **Catchment Radius** | 1,600 m (local proximity, widened for lower density) |
+| **Census Blocks** | 28,087 in the city (23,843 with residents); 91,516 county blocks modelled |
+| **Facilities** | 423 HRSA health center sites in the city; all 898 in LA County modelled (777 FQHCs, 121 look-alikes) |
+| **Population** | 3,898,747 residents (2020 Census) |
+| **CRS** | EPSG:32611 (UTM 11N, metres) |
 | **Config** | [`case_studies/la_fqhc.yaml`](case_studies/la_fqhc.yaml) |
 | **Data Sources** | TIGER 2020 blocks, HRSA FQHC directory |
-| **Gini Coefficient** | 0.7186 (moderate-high inequality) |
-| **Zero-Access Blocks** | ~2,800 blocks (12% of population) |
+| **Gini Coefficient** | 0.616 (blocks with residents) |
+| **Zero-Access Blocks** | 6,813 blocks (28.6% of blocks with residents; 23.9% of residents) |
 
-**Key Insight**: FQHC network is more uniformly distributed than specialized care, but significant accessibility gaps persist in areas with topographical barriers (canyons, mountains) and sparse settlement.
+**Key Insight**: Fewer city residents lack any health center in reach than in DC or NYC, but most of those left behind are diluted — a center nearby, over-subscribed — and dilution rises with social vulnerability.
 
 ---
 
@@ -400,11 +400,11 @@ except S3CredentialsError:
 ```
 blocks_Washington_DC.shp              (6,012 blocks, EPSG:26985)
 blocks_New_York_City.shp              (37,984 blocks, EPSG:32618)
-blocks_Los_Angeles_urban.shp          (65,485 blocks, EPSG:2230)
+blocks_Los_Angeles_county_enhanced.shp (91,516 blocks, EPSG:32611)
 
 ICFs_DC.shp                            (114 ICF facilities, EPSG:26985)
 Dialysis_NYC.shp                       (135 dialysis centers, EPSG:32618)
-FQHC_LA.shp                            (630 FQHCs, EPSG:2230)
+FQHC_LA_county.shp                     (898 HRSA sites, EPSG:32611)
 
 blocks_Los_Angeles_enhanced.shp        (LA blocks enriched with sociodemographic columns)
 ```
@@ -475,8 +475,8 @@ If missing, defaults to 0.0 (equal-weight baseline).
 ### Bronze Layer (Raw Ingested Data)
 **Location**: `outputs/results/bronze/run_date=YYYY-MM-DD/`
 ```
-ca_fqhc_population.parquet         (65,485 rows, ~2 MB)
-ca_fqhc_facilities.parquet         (630 rows, ~100 KB)
+ca_fqhc_population.parquet         (91,516 rows)
+ca_fqhc_facilities.parquet         (898 rows)
 dc_icf_population.parquet          (6,012 rows, ~200 KB)
 dc_icf_facilities.parquet          (114 rows, ~20 KB)
 ny_dialysis_population.parquet     (37,984 rows, ~1.2 MB)
@@ -502,7 +502,7 @@ dc_icf_facilities.parquet          (114 rows, validated)
 ```
 dc_icf_accessibility.parquet       (6,012 blocks × 1 score = accessibility index)
 ny_dialysis_accessibility.parquet  (37,984 blocks × 1 score)
-ca_fqhc_accessibility.parquet      (65,485 blocks × 1 score)
+ca_fqhc_accessibility.parquet      (91,516 blocks × 1 score)
 
 dc_icf_accessibility.csv           (human-readable export)
 ny_dialysis_accessibility.csv
@@ -687,11 +687,11 @@ def test_write_gold_layer_creates_parquet():
 
 | Metric | DC | NYC | LA |
 |--------|----|----|-----|
-| **Blocks Processed** | 6,012 | 37,984 | 65,485 |
-| **Facilities Matched** | 114 | 135 | 630 |
-| **% Blocks with Access** | 80% | 53% | 88% |
-| **Gini Coefficient** | 0.8203 | 0.7705 | 0.7186 |
-| **Mean Accessibility Score** | 2.1 | 3.0 | 3.4 |
+| **Blocks Processed** | 6,012 | 37,984 | 91,516 |
+| **Facilities Matched** | 114 | 135 | 898 (423 in the city) |
+| **% Blocks with Access** | 69.4% | 53.9% | 71.4% |
+| **Gini Coefficient** | 0.799 | 0.820 | 0.616 |
+| **Mean Accessibility Score** | 40.0 | 7.8 | 6.6 |
 
 ---
 
@@ -798,7 +798,7 @@ docker push $ECR_URL/healthcare-accessibility:latest
 ### For Research/Science Roles
 **Highlight**:
 - Novel Enhanced 2SFCA method with sociodemographic weighting
-- Population-weighted Gini coefficient calculation
+- Block-level Gini coefficient over blocks with residents (each block counted equally)
 - Reproducible research with Jupyter notebooks
 - Three case studies with 109,000+ census blocks
 

@@ -3,18 +3,30 @@
 # Run: python run_pipeline.py --config case_studies/la_fqhc.yaml
 #
 # Setup:
-#   1. python scripts/acquire_la_data.py   (run once)
-#   2. Set use_snapshot: true below
+#   1. python scripts/acquire_la_data.py   (run once: all LA County blocks)
+#   2. python scripts/acquire_acs.py --config case_studies/la_fqhc.yaml \
+#        --blocks data/intermediate_files/blocks_Los_Angeles.shp \
+#        --out data/intermediate_files/blocks_Los_Angeles_county_enhanced.shp
 
 study_area:
-  name: "Los Angeles"
+  name: "City of Los Angeles"
   state_fips: "06"
   state_abbrev: "CA"
   county_fips: ["037"]
   coordinate_system: "EPSG:32611"   # UTM Zone 11N (metres)
   distance_unit: "meters"
-  clip_to_mainland: true
+  # Mainland LA County; the southern edge (33.70°N) leaves out Catalina and
+  # San Clemente Islands, which cannot reach a mainland facility.
   bbox: [-118.9448, 33.7037, -117.6464, 34.8233]
+  # The model runs on all of LA County — residents and clinics across the city line
+  # serve and compete with each other (the city surrounds Beverly Hills, Santa
+  # Monica, Culver City...) — but statistics, maps and the dashboard report the
+  # City of Los Angeles (Census place 0644000), matching DC and NYC as cities.
+  report_area:
+    boundary: "data/reference/places/tl_2020_06_place.zip"
+    url: "https://www2.census.gov/geo/tiger/TIGER2020/PLACE/tl_2020_06_place.zip"
+    id_column: "GEOID"
+    id: "0644000"
 
 facility:
   type: "FQHC"
@@ -41,13 +53,6 @@ analysis:
   population_column: "population"
   method_label: "SDW-2SFCA"
 
-data:
-  snapshot:
-    use_snapshot: true
-  local_shapefiles:
-    facilities: "data/intermediate_files/FQHC_LA.shp"
-    census_blocks: "data/intermediate_files/blocks_Los_Angeles_enhanced.shp"
-
 s3:
   prefix: "healthcare-accessibility"
   bronze: "bronze"
@@ -64,9 +69,16 @@ data:
   snapshot:
     use_snapshot: true
   local_shapefiles:
-    facilities: "data/intermediate_files/FQHC_LA.shp"
-    census_blocks: "data/intermediate_files/blocks_Los_Angeles_enhanced.shp"
+    # Every HRSA health center and look-alike site in LA County (FIPS 06037), built by
+    # scripts/acquire_la_data.py with no geographic clipping.
+    facilities: "data/intermediate_files/FQHC_LA_county.shp"
+    # All mainland LA County blocks with ACS income, insurance and age columns
+    # apportioned from tracts by block population, as for DC; built by
+    # scripts/acquire_la_data.py then scripts/acquire_acs.py.
+    census_blocks: "data/intermediate_files/blocks_Los_Angeles_county_enhanced.shp"
   population_column: "population"
+  # Blocks with no residents keep population 0: no demand, left out of statistics.
+  empty_blocks: "exclude"
   intermediate:
     path: "data/intermediate_files/"
   output:

@@ -11,7 +11,7 @@ The **Spatial Accessibility Pipeline** is an extension of a novel spatial access
 This repository transforms that research method into a **production-ready, open-source geospatial data pipeline** that enables health systems, city planners, and policy analysts to:
 
 - **Identify healthcare access deserts** at census block resolution
-- **Quantify access inequality** using Gini coefficients (each census block counted equally) and population-weighted Lorenz curves
+- **Quantify access inequality** using Gini coefficients and Lorenz curves over census blocks with residents, each block counted equally
 - **Compare facility networks** across cities, facility types, and policy scenarios
 - **Test "what-if" scenarios** interactively (add clinics, change catchment radii, adjust supply assumptions)
 - **Reproduce analyses for any jurisdiction** using open data and configuration-driven workflows
@@ -37,9 +37,9 @@ The pipeline has been applied to three deliberately chosen case studies, each te
 
 | Study | Facility Type | Census Blocks | Facilities | Population | Catchment | Gini | Key Insight |
 |---|---:|---:|---:|---:|---:|---:|---|
-| **Washington, D.C.** | Intermediate Care Facilities (ICF) | 6,012 | 114 | 620K | 900 m | **0.8203** | Starkest inequality: outer wards (SE/NE) systematically underserved |
-| **New York City** | Dialysis Centers | 37,984 | 135 | 8.8M | 1,200 m | **0.7705** | Facilities cluster in Manhattan; outer boroughs face connectivity barriers |
-| **Los Angeles** | Federally Qualified Health Centers (FQHCs) | 65,485 | 630 | 13M | 1,600 m | **0.7186** | More uniform primary care network, but topographic barriers strand pockets |
+| **Washington, D.C.** | Intermediate Care Facilities (ICF) | 4,500 with residents (of 6,012) | 114 | 690K | 900 m | **0.799** | 30.6% of blocks with no ICF in reach; 203K residents left behind (isolated 109K, diluted 94K) |
+| **New York City** | Dialysis Centers | 30,696 with residents (of 37,984) | 135 | 8.8M | 1,200 m | **0.820** | 46.1% of blocks with no dialysis center in reach; 2.1M left behind, two-thirds by dilution |
+| **City of Los Angeles** | FQHCs and look-alikes (HRSA) | 23,843 with residents (of 28,087) | 423 in the city (898 in LA County, all modelled) | 3.9M | 1,600 m | **0.616** | 28.6% of blocks with no health center in reach; 648K left behind, mostly by dilution |
 
 ### Why These Three?
 
@@ -51,11 +51,15 @@ Together, they span different care models, geographies, and catchment patterns, 
 
 ### Findings
 
-**DC shows the starkest inequality**: a Gini of 0.8203, with zero-access blocks concentrated in outer wards where low-income, uninsured populations face the longest travel distances and the fewest nearby facilities.
+All statistics count census blocks with residents only (blocks with no residents keep a population of 0 and are left out). The catchment radii differ by design, and the Gini depends strongly on the radius, so the cities are not ranked against each other; `scripts/comparison_analysis/catchment_sensitivity.py` reports each study at 900, 1,200 and 1,600 m.
 
-**NYC shows high inequality** (Gini 0.7705; 46.6% of blocks have no dialysis center within 1,200 m), with dialysis facilities clustering in Manhattan and connectivity challenges in outer boroughs creating pockets of underservice despite overall network density.
+**People are left behind in two ways.** *Isolated* blocks have no facility within the catchment; any catchment-based method finds the same ones. *Diluted* blocks have a facility nearby whose supply is stretched by demand; only a method that models competition for supply can see them. "Left behind" is the densest third of blocks (by residents) in either group; diluted means access in the lower half of blocks with any (population-weighted).
 
-**LA shows the least inequality of the three** (Gini 0.7186), with FQHC coverage more widespread but still stranded pockets behind topographical barriers (canyons, mountains) and in areas of sparse settlement.
+**DC** (Gini 0.799): 30.6% of blocks with residents have no ICF within 900 m. Isolation falls mostly on the least vulnerable tracts (26% of residents in the lowest SVI quartile vs 2% in the highest), dilution on the more vulnerable.
+
+**NYC** (Gini 0.820): 46.1% of blocks have no dialysis center within 1,200 m. Of the 2.1M residents left behind, 1.4M are in diluted blocks — a center nearby, but over-subscribed.
+
+**City of Los Angeles** (Gini 0.616): modelled on all of LA County — residents and clinics across the city line serve and compete with each other — and reported for the city (`report_area` in `case_studies/la_fqhc.yaml`). 28.6% of blocks have no health center within 1,600 m; isolation falls with vulnerability (8% of residents in the least vulnerable SVI quartile, 1% in the most) while dilution rises (8% to 15%).
 
 ### Reproducibility
 
@@ -79,7 +83,7 @@ The **Socio-demographically Weighted 2SFCA (SDW-2SFCA)** framework extends the t
 
 ### Why It Matters
 
-Standard 2SFCA reports a **Gini coefficient of 0.00** (perfect equality) for DC intermediate care facilities — a result that masks severe structural inequality. The SDW-2SFCA framework reveals a **Gini of 0.8203** for the same network, correctly identifying outer wards as systematically underserved. This is not a mathematical artifact; it is a measurement that respects the real distribution of need.
+On identical inputs for DC (same blocks, facilities, 900 m catchment and decay), each step up the method ladder changes what you see: cumulative opportunity gives a Gini of 0.57, gravity 0.63, E2SFCA (competition for supply) 0.71, and SDW-2SFCA (socio-demographic demand weighting) 0.80. Hansen, with no cutoff, gives every block some access and hides the gap entirely (0.41, no zero-access blocks). Methods without competition also miss diluted blocks: a gravity model misses about 24,000 DC residents that SDW-2SFCA flags as left behind. Reproduce with `python scripts/comparison_analysis/method_comparison.py`.
 
 ### Implementation
 
@@ -168,6 +172,8 @@ The **Healthcare Access Intelligence Dashboard** ([dashboard/app.py](dashboard/a
 - **Switch between three cities**: DC (ICF), NYC (Dialysis), LA (FQHCs)
 - **Explore interactive visualizations**:
   - Choropleth map with a teal accessibility scale, zero-access blocks in orange
+  - Block search and selection: enter a Census Block GEOID (or a tract / block-group prefix), or click a block on the map, to outline it and see its score, population and nearest facility
+  - Basemap switcher: CARTO Positron (default), CARTO Voyager, CARTO Dark Matter, OpenStreetMap, Esri satellite
   - Lorenz curves with Gini coefficients for inequality measurement
   - Priority zone identification (high population + low access areas)
   - Distribution histograms and statistical summaries
@@ -215,11 +221,11 @@ Block-level accessibility scores with facility overlays. Color scale uses a soft
 
 ### 2. Lorenz Curve and Gini Coefficient
 
-Population-weighted inequality visualization. The further the curve bows below the diagonal, the greater the inequality. Gini coefficient quantifies the area between the curve and the diagonal.
+Inequality across census blocks with residents, each block counted equally (blocks with no residents are excluded). The further the curve bows below the diagonal, the greater the inequality; the Gini coefficient is twice the area between the curve and the diagonal.
 
 ![Lorenz curve comparison](outputs/figures/dc_icf_lorenz_curve.png)
 
-**Interpretation**: A Gini of 0.8203 means accessibility is highly concentrated in a small fraction of the population. The Lorenz curve shows that 50% of DC residents capture only ~15% of total access.
+**Interpretation**: A Gini of 0.799 means accessibility is highly concentrated in a small share of DC's census blocks with residents. The least-served half of blocks hold about 1% of total modelled access, and the least-served 80% about 17%.
 
 ### 3. Bivariate Map (Population × Accessibility)
 
@@ -265,11 +271,12 @@ is kept for reference. Both read the same pre-computed results.
 
 The overview leads with the number of residents living in zero-access blocks, followed by the
 share of blocks with no access, facility count, and Gini index, plus a one-sentence key finding.
-Metric cards have explanatory tooltips. For DC, resident counts are the official 2020 Census
-block counts ([reference file](dashboard/reference/dc_icf_block_population_2020.csv), rebuilt with
-`python scripts/data_preparation/official_block_population.py`). The published scores were computed
-with a population input in which the 1,512 empty DC blocks were set to the median (62), which
-totals 783,289 instead of the official 689,545; exports keep that input as `population_model_input`.
+Metric cards have explanatory tooltips. Population is the official 2020 Census block count in
+all three studies. Blocks with no residents keep a population of 0 (`empty_blocks: exclude` in each
+case-study YAML): they add no demand, are drawn grey, and are left out of the statistics. DC's
+snapshot had set its 1,512 empty blocks to the median, so `case_studies/dc.yaml` reads the official
+counts from a [reference file](case_studies/reference/dc_block_population_2020.csv) instead
+(rebuilt with `python scripts/data_preparation/official_block_population.py`).
 
 Map hover cards identify blocks by Census Block GEOID and show accessibility score,
 population, study-facility count within the configured catchment, and nearest study
@@ -277,6 +284,12 @@ facility distance. Proximity uses projected, metre-based centroid distances, mat
 the pipeline's spatial approach, not travel routes. Missing facility data is shown as
 unavailable rather than zero. Facility proximity does not imply available capacity or
 eligibility, and the Gini index describes study-wide inequality, not individual blocks.
+The **Find a census block** box above the map zooms to and outlines a block by GEOID and
+shows the same details as its hover card; an 11-digit tract or 12-digit block-group ID
+lists the matching blocks to choose from. Clicking a block on the map selects it the same
+way; **Clear selection** returns to the full study view. Because Streamlit redraws the
+chart on each selection, the map re-centres on the selected block rather than keeping the
+previous zoom.
 
 The map uses a single teal color scale for blocks with a score above zero,
 linear and capped at the selected study's 95th-percentile score. Scores above the cap

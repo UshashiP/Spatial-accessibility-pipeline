@@ -166,6 +166,89 @@ def _load_local_blocks(config: dict) -> gpd.GeoDataFrame:
     return gdf[keep_cols].dropna(subset=["geometry"]).reset_index(drop=True)
 
 
+# ── Population settings ───────────────────────────────────────────────────────
+
+def _apply_population_settings(gdf: gpd.GeoDataFrame, config: dict) -> gpd.GeoDataFrame:
+    """
+    Apply the population options in config ``data``:
+
+    population_reference
+        CSV with GEOID and population_2020 columns that replaces the loaded
+        population, e.g. official 2020 block counts where a snapshot was edited.
+        It must cover every block.
+    empty_blocks
+        "exclude" (default): blocks with no residents keep a population of 0,
+        so they add no demand and are left out of summary statistics.
+        "median": they are set to the median block population (zeros included).
+    """
+    data_cfg = config.get("data", {})
+
+    reference = data_cfg.get("population_reference")
+    if reference:
+        official = pd.read_csv(reference, dtype={"GEOID": str})
+        merged = gdf[["GEOID"]].astype(str).merge(official, on="GEOID", how="left", validate="one_to_one")
+        if merged["population_2020"].isna().any():
+            raise ValueError(
+                f"{reference} does not cover every census block "
+                f"({int(merged['population_2020'].isna().sum())} missing)."
+            )
+        gdf = gdf.copy()
+        gdf["population"] = merged["population_2020"].astype(int).to_numpy()
+        log.info("Population from reference %s (total %s)", reference, f"{gdf['population'].sum():,}")
+
+    mode = data_cfg.get("empty_blocks", "exclude")
+    empty = gdf["population"] == 0
+    if mode == "median":
+        median = int(gdf["population"].median())
+        gdf = gdf.copy()
+        gdf.loc[empty, "population"] = median
+        log.info("Empty blocks: %d set to the median block population (%d)", int(empty.sum()), median)
+    elif mode == "exclude":
+        log.info("Empty blocks: %d kept at 0 (no demand; excluded from statistics)", int(empty.sum()))
+    else:
+        raise ValueError(f"data.empty_blocks must be 'exclude' or 'median', got {mode!r}")
+    return gdf
+
+
+def report_area_mask(geometries: gpd.GeoSeries, config: dict) -> pd.Series:
+    """
+    True for geometries inside the study's reporting area.
+
+    ``study_area.report_area`` lets a study model a wider region than it reports:
+    LA models all of LA County — residents and clinics across the city line serve
+    and compete with each other — but reports the City of Los Angeles. Its keys:
+    ``boundary`` (a vector file, read with GeoPandas), ``url`` (downloaded to
+    ``boundary`` when missing), ``id_column`` and ``id`` (the feature to use).
+    A geometry counts as inside when its representative point is. Without a
+    report_area every geometry is inside.
+    """
+    area = config.get("study_area", {}).get("report_area")
+    if not area:
+        return pd.Series(True, index=geometries.index)
+    path = Path(area["boundary"])
+    if not path.exists() and area.get("url"):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        log.info("Downloading report-area boundary %s", area["url"])
+        path.write_bytes(get_with_retry(area["url"], {}).content)
+    boundary = gpd.read_file(f"zip://{path}" if path.suffix == ".zip" else path)
+    boundary = boundary[boundary[area.get("id_column", "GEOID")].astype(str) == str(area["id"])]
+    if len(boundary) != 1:
+        raise ValueError(f"report_area: expected one feature with id {area['id']} in {path}, found {len(boundary)}")
+    shape = boundary.to_crs(geometries.crs).geometry.iloc[0]
+    return geometries.representative_point().within(shape)
+
+
+def _apply_report_area(gdf: gpd.GeoDataFrame, config: dict) -> gpd.GeoDataFrame:
+    """Flag blocks inside the reporting area (all blocks when none is configured)."""
+    gdf = gdf.copy()
+    gdf["in_report_area"] = report_area_mask(gdf.geometry, config).to_numpy()
+    if not gdf["in_report_area"].all():
+        inside = gdf["in_report_area"]
+        log.info("Report area: %d of %d blocks (%s residents) — the rest are modelled, not reported",
+                 int(inside.sum()), len(gdf), f"{int(gdf.loc[inside, 'population'].sum()):,}")
+    return gdf
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def ingest_census_blocks(config: dict | None = None) -> gpd.GeoDataFrame:
@@ -196,7 +279,7 @@ def ingest_census_blocks(config: dict | None = None) -> gpd.GeoDataFrame:
         try:
             gdf = _load_local_blocks(config)
             log.info("Census ingest (snapshot) complete: %d blocks", len(gdf))
-            return gdf
+            return _apply_report_area(_apply_population_settings(gdf, config), config)
         except FileNotFoundError as exc:
             log.warning("Snapshot census file missing (%s) — falling back to Census API", exc)
 
@@ -226,14 +309,14 @@ def ingest_census_blocks(config: dict | None = None) -> gpd.GeoDataFrame:
         gdf = gdf.dropna(subset=["geometry"]).reset_index(drop=True)
 
         log.info("Census ingest (API) complete: %d blocks", len(gdf))
-        return gdf
+        return _apply_report_area(_apply_population_settings(gdf, config), config)
 
     except Exception as exc:
         log.warning("Census API failed (%s) — falling back to local shapefile", exc)
         try:
             gdf = _load_local_blocks(config)
             log.info("Census ingest (local fallback) complete: %d blocks", len(gdf))
-            return gdf
+            return _apply_report_area(_apply_population_settings(gdf, config), config)
         except FileNotFoundError as local_exc:
             raise RuntimeError(
                 "Census ingest could not proceed: live API unavailable and local snapshot missing. "

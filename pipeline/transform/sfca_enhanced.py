@@ -96,6 +96,7 @@ def compute_enhanced_2sfca(
     insurance_col: str = "HI_block",
     age_col: str = "age_18to65",
     normalise_inputs: bool = True,
+    weights: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0),
 ) -> gpd.GeoDataFrame:
     """
     Run the corrected enhanced 2SFCA model.
@@ -123,6 +124,10 @@ def compute_enhanced_2sfca(
         If True (default), min-max normalise pop, income, insurance, and age
         before computing weights.  Set to False only if columns are already
         normalised [0,1] and you want to preserve them as-is.
+    weights : tuple of 4 floats
+        Coefficients on population, income, insurance and age in the
+        socio-economic weight. The default (1, 1, 1, 1) is the equal weighting
+        of the published method; other values are for sensitivity analysis.
 
     Returns
     -------
@@ -162,6 +167,9 @@ def compute_enhanced_2sfca(
     else:
         AGE = np.zeros(n_pop, dtype=float)
     BEDS = facility_gdf[supply_col].fillna(0).to_numpy(dtype=float)
+    populated = POP > 0  # before normalising, which maps the smallest block to 0
+    if "in_report_area" in population_gdf.columns:   # summarise the reported area only
+        populated &= population_gdf["in_report_area"].fillna(False).to_numpy(bool)
 
     # ── Normalise [0, 1] ─────────────────────────────────────────────────
     if normalise_inputs:
@@ -175,7 +183,8 @@ def compute_enhanced_2sfca(
     # Equal unweighted sum: all four variables are on a common [0,1] scale
     # and contribute commensurably.  To use custom weights, replace the
     # coefficients below (e.g. 0.4*POP + 0.3*INC + ...).
-    SW = POP + INC + HI + AGE    # shape: (n_pop,)
+    w_pop, w_inc, w_hi, w_age = weights
+    SW = w_pop * POP + w_inc * INC + w_hi * HI + w_age * AGE    # shape: (n_pop,)
 
     # ── Centroid coordinate arrays ────────────────────────────────────────
     b_coords = np.column_stack([
@@ -251,13 +260,15 @@ def compute_enhanced_2sfca(
         f    = _truncated_gaussian(dists, d0)
         A[i] = float(np.dot(R[idx], f))
 
-    # ── Summary ───────────────────────────────────────────────────────────
+    # ── Summary (blocks with residents, matching the figures) ────────────
+    Ap = A[populated] if populated.any() else A
     log.info(
-        "Enhanced 2SFCA complete — "
+        "Enhanced 2SFCA complete — %d reported blocks with residents (%d other blocks) — "
         "max=%.4f  mean=%.4f  median=%.4f  zeros=%d (%.1f%%)  Gini=%.4f",
-        A.max(), A.mean(), float(np.median(A)),
-        int((A == 0).sum()), (A == 0).mean() * 100,
-        _gini(A),
+        len(Ap), n_pop - len(Ap),
+        Ap.max(), Ap.mean(), float(np.median(Ap)),
+        int((Ap == 0).sum()), (Ap == 0).mean() * 100,
+        _gini(Ap),
     )
 
     # ── Assemble result GeoDataFrame ─────────────────────────────────────

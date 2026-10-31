@@ -12,7 +12,8 @@ population), summary level 750 (census block). No API key is needed.
 Run from the repository root:
     python scripts/data_preparation/official_block_population.py
 
-Writes dashboard/reference/dc_icf_block_population_2020.csv (GEOID, population_2020).
+Writes case_studies/reference/dc_block_population_2020.csv (GEOID, population_2020),
+the population_reference used by case_studies/dc.yaml.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ URL = (
     "https://www2.census.gov/programs-surveys/decennial/2020/data/"
     "01-Redistricting_File--PL_94-171/District_of_Columbia/dc2020.pl.zip"
 )
-OUTPUT = REPO / "dashboard" / "reference" / "dc_icf_block_population_2020.csv"
+OUTPUT = REPO / "case_studies" / "reference" / "dc_block_population_2020.csv"
 BLOCK_SUMLEV = "750"
 EXPECTED_BLOCKS = 6012
 

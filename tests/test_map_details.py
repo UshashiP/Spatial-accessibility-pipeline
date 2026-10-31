@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from shapely.geometry import Point, box
 
-from dashboard.map_details import build_block_details, build_color_scale
+from dashboard.map_details import build_block_details, build_color_scale, populated_mask, search_blocks
 
 
 @pytest.fixture
@@ -121,3 +121,64 @@ def test_zero_percentile_falls_back_to_full_range():
 def test_invalid_map_scores_are_rejected(scores):
     with pytest.raises(ValueError, match="Map scores"):
         build_color_scale(np.array(scores))
+
+
+GEOIDS = pd.Series(["110010030001001", "110010030001002", "110010030002000", "110010002024005"])
+
+
+def test_search_exact_geoid_ignores_separators():
+    assert search_blocks(GEOIDS, " 11001-003000 1001 ") == ["110010030001001"]
+
+
+def test_search_prefix_lists_sorted_blocks_with_limit():
+    assert search_blocks(GEOIDS, "11001003000") == [
+        "110010030001001", "110010030001002", "110010030002000"]
+    assert search_blocks(GEOIDS, "11001003000", limit=2) == [
+        "110010030001001", "110010030001002"]
+
+
+def test_search_no_match_or_no_digits():
+    assert search_blocks(GEOIDS, "99999") == []
+    assert search_blocks(GEOIDS, "Columbia Heights") == []
+
+
+def test_block_zoom_scales_with_block_size_and_is_clamped():
+    from dashboard.map_details import block_zoom
+
+    city_block = block_zoom((-77.032, 38.929, -77.030, 38.931))
+    assert 15 < city_block < 16
+    assert block_zoom((-77.0320, 38.9290, -77.0316, 38.9294)) > city_block
+    assert block_zoom((-119.0, 34.0, -118.0, 35.0)) == 12.0
+    assert block_zoom((-77.0, 38.9, -77.0, 38.9)) == 16.5
+
+
+def test_populated_mask_marks_blocks_with_residents():
+    blocks = pd.DataFrame({"population": [0, 5, 0, 3]})
+    assert populated_mask(blocks).tolist() == [False, True, False, True]
+
+
+def test_classify_bivariate_tiers_and_left_behind():
+    from dashboard.map_details import ISOLATED, classify_bivariate
+    # Six 1-km² blocks plus one empty block; density rises with population.
+    blocks = gpd.GeoDataFrame(
+        {"GEOID": [str(i) for i in range(7)],
+         "population": [10, 20, 30, 400, 500, 600, 0],
+         "accessibility_score": [0.0, 0.0, 5.0, 2.0, 9.0, 0.0, 0.0]},
+        geometry=[box(i * 2000, 0, i * 2000 + 1000, 1000) for i in range(7)],
+        crs="EPSG:32618",
+    )
+    result = classify_bivariate(blocks, "EPSG:32618")
+    assert len(result) == 6  # the empty block is left out
+    np.testing.assert_allclose(result["density"], [10, 20, 30, 400, 500, 600])
+    # Tiers are population-weighted: the sparse blocks hold few residents, so they
+    # share the low tier and the densest block alone is high.
+    assert result.loc[[0, 1, 2], "density_tier"].eq("low").all()
+    assert result.loc[5, "density_tier"] == "high"
+    # Over a third of residents have no access, so the low access tier is the zero scores.
+    assert (result["access_tier"] == "low").tolist() == (blocks["accessibility_score"][:6] == 0).tolist()
+    assert result.loc[5, "bivariate_class"] == ISOLATED
+
+
+def test_populated_mask_respects_report_area():
+    blocks = pd.DataFrame({"population": [5, 5, 0], "in_report_area": [True, False, True]})
+    assert populated_mask(blocks).tolist() == [True, False, False]
