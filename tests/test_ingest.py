@@ -39,7 +39,7 @@ class TestCensusIngest:
         for i, geoid in enumerate(["110010001001000", "110010001001001", "110010001001002"]):
             features.append({
                 "type": "Feature",
-                "properties": {"GEOID20": geoid},
+                "properties": {"GEOID": geoid},
                 "geometry": {
                     "type": "Polygon",
                     "coordinates": [[
