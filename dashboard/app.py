@@ -366,12 +366,12 @@ h1, h2, h3, h4 {
 MAP_PALETTE = px.colors.sequential.Teal
 NO_ACCESS_COLOR = "#e8833a"
 NO_RESIDENTS_COLOR = "#dcdcdc"
-# Keyless basemaps. "outline" and "facility" keep the selection and markers visible on each.
+# Keyless basemaps. "outline" keeps the selection visible on each.
 BASEMAPS = {
-    "Light (CARTO Positron)": {"style": "carto-positron", "outline": "#172b3a", "facility": "#172b3a"},
-    "Streets (CARTO Voyager)": {"style": "carto-voyager", "outline": "#172b3a", "facility": "#172b3a"},
-    "Dark (CARTO Dark Matter)": {"style": "carto-darkmatter", "outline": "#ffd400", "facility": "#ffffff"},
-    "OpenStreetMap": {"style": "open-street-map", "outline": "#172b3a", "facility": "#172b3a"},
+    "Light (CARTO Positron)": {"style": "carto-positron", "outline": "#172b3a"},
+    "Streets (CARTO Voyager)": {"style": "carto-voyager", "outline": "#172b3a"},
+    "Dark (CARTO Dark Matter)": {"style": "carto-darkmatter", "outline": "#ffd400"},
+    "OpenStreetMap": {"style": "open-street-map", "outline": "#172b3a"},
     "Satellite (Esri)": {
         "style": "white-bg",
         "layers": [{
@@ -382,7 +382,6 @@ BASEMAPS = {
             "sourceattribution": "Imagery © Esri, Maxar, Earthstar Geographics",
         }],
         "outline": "#ffd400",
-        "facility": "#ffffff",
     },
 }
 
@@ -420,6 +419,8 @@ CITIES = {
     },
 }
 
+FACILITY_BADGE = "#d90429"
+
 # ── Helper Functions ───────────────────────────────────────────────────────────
 def map_geometry(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Blocks in EPSG:4326, simplified (~3 m) and rounded (~1 m) to shrink the map
@@ -428,6 +429,53 @@ def map_geometry(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     simplified = out.geometry.simplify(3e-5, preserve_topology=True)
     out["geometry"] = shapely.transform(simplified.values, lambda coords: coords.round(5))
     return out
+
+
+def facility_trace(facilities_gdf: gpd.GeoDataFrame, cfg: dict, size: int, color: str,
+                   hover: bool = True, label: str | None = None) -> go.Scattermap:
+    """Facility points with name and recorded supply on hover, optionally labelled."""
+    points = facilities_gdf.to_crs(cfg["crs"]).geometry.centroid.to_crs("EPSG:4326")
+    names = (
+        facilities_gdf["FAC_NAME"].fillna("Unnamed facility").astype(str).map(escape)
+        if "FAC_NAME" in facilities_gdf
+        else pd.Series("Unnamed facility", index=facilities_gdf.index)
+    )
+    supply = (
+        pd.to_numeric(facilities_gdf["supply"], errors="coerce")
+        if "supply" in facilities_gdf
+        else pd.Series(np.nan, index=facilities_gdf.index)
+    )
+    supply_labels = supply.map(lambda value: "Unavailable" if pd.isna(value) else f"{value:,.5g}")
+    return go.Scattermap(
+        lat=points.y,
+        lon=points.x,
+        mode="markers+text" if label else "markers",
+        marker=dict(size=size, color=color, opacity=0.9 if not label else 1),
+        text=[label] * len(points) if label else None,
+        textposition="middle center",
+        textfont=dict(size=size, color="white", family="Open Sans Bold"),
+        selected=dict(marker=dict(opacity=0.9)),
+        unselected=dict(marker=dict(opacity=0.9)),
+        name="Study facilities",
+        customdata=np.column_stack([names, supply_labels]),
+        hovertemplate=(
+            "<b>%{customdata[0]}</b><br>"
+            f"{cfg['facility']}<br>"
+            f"Recorded supply ({cfg['supply_label']}): %{{customdata[1]}}"
+            "<extra>Study facility</extra>"
+        ) if hover else None,
+        hoverinfo=None if hover else "skip",
+        showlegend=hover,
+    )
+
+
+def facility_badge_traces(facilities_gdf: gpd.GeoDataFrame, cfg: dict) -> list[go.Scattermap]:
+    """Facilities as a red health badge on a white ring, visible on every map colour.
+    The basemaps have no hospital icon or cross glyph, so the mark is a "+" label."""
+    return [
+        facility_trace(facilities_gdf, cfg, size=10, color="white", hover=False),
+        facility_trace(facilities_gdf, cfg, size=8, color=FACILITY_BADGE, label="+"),
+    ]
 
 
 def find_latest_parquet(layer: str, dataset: str) -> Path | None:
@@ -693,6 +741,7 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
     if clicked_geoid not in set(map_blocks["GEOID"]):
         clicked_geoid = None
     selected_geoid = clicked_geoid or searched_geoid
+    st.session_state[f"selected_block_{prefix}"] = selected_geoid
     if selected_geoid is not None:
         block = map_blocks.loc[map_blocks["GEOID"] == selected_geoid].iloc[0]
         scores = map_blocks.loc[map_blocks["populated"], "accessibility_score"]
@@ -805,39 +854,11 @@ def render_map_tab(scores_gdf, facilities_gdf, cfg):
                 ticktext=color_scale.labels,
             ),
         ))
-    if show_facilities and not facilities_gdf.empty:
-        facility_points = facilities_gdf.to_crs(cfg["crs"]).geometry.centroid.to_crs("EPSG:4326")
-        names = (
-            facilities_gdf["FAC_NAME"].fillna("Unnamed facility").astype(str).map(escape)
-            if "FAC_NAME" in facilities_gdf
-            else pd.Series("Unnamed facility", index=facilities_gdf.index)
-        )
-        supply = (
-            pd.to_numeric(facilities_gdf["supply"], errors="coerce")
-            if "supply" in facilities_gdf
-            else pd.Series(np.nan, index=facilities_gdf.index)
-        )
-        supply_labels = supply.map(
-            lambda value: "Unavailable" if pd.isna(value) else f"{value:,.5g}"
-        )
-        fig.add_trace(go.Scattermap(
-            lat=facility_points.y,
-            lon=facility_points.x,
-            mode="markers",
-            marker=dict(size=5, color=basemap["facility"], opacity=0.9),
-            selected=dict(marker=dict(opacity=0.9)),
-            unselected=dict(marker=dict(opacity=0.9)),
-            name="Study facilities",
-            customdata=np.column_stack([names, supply_labels]),
-            hovertemplate=(
-                "<b>%{customdata[0]}</b><br>"
-                f"{cfg['facility']}<br>"
-                f"Recorded supply ({cfg['supply_label']}): %{{customdata[1]}}"
-                "<extra>Study facility</extra>"
-            ),
-        ))
+    facility_traces = (facility_badge_traces(facilities_gdf, cfg)
+                       if show_facilities and not facilities_gdf.empty else [])
+    fig.add_traces(facility_traces)
 
-    block_curves = list(range(len(fig.data) - (1 if show_facilities and not facilities_gdf.empty else 0)))
+    block_curves = list(range(len(fig.data) - len(facility_traces)))
     map_center = {"lat": center.y.mean(), "lon": center.x.mean()}
     map_zoom = 10
     if selected_geoid is not None:
@@ -1039,7 +1060,12 @@ def _bivariate_legend_html() -> str:
         "<div style='writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600'>Access →</div>"
         f"<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:2px;max-width:9rem'>{cells}</div>"
         "<div></div><div style='font-weight:600'>Density →</div></div>"
-        f"{corners}</div>"
+        f"{corners}"
+        "<div style='display:flex;gap:.5rem;align-items:center;margin-top:.6rem'>"
+        f"<span style='flex:none;width:.6rem;height:.6rem;margin:0 .1rem;border-radius:50%;background:{FACILITY_BADGE};"
+        "color:white;font-size:.55rem;font-weight:700;line-height:.6rem;text-align:center;"
+        "box-shadow:0 0 0 1.5px white,0 0 0 2.5px #9aa5b1'>+</span>"
+        "<strong>Study facility</strong></div></div>"
     )
 
 
@@ -1103,15 +1129,42 @@ def render_left_behind_tab(scores_gdf, facilities_gdf, cfg):
             ),
             marker=dict(opacity=0.85, line=dict(width=0.2, color="rgba(255,255,255,0.7)")),
         ))
+    if not facilities_gdf.empty:
+        fig.add_traces(facility_badge_traces(facilities_gdf, cfg))
+
+    # The block searched or clicked on the Access map, outlined and centred here too.
+    selected_geoid = st.session_state.get(f"selected_block_{cfg['prefix']}")
+    is_selected = blocks_4326["GEOID"] == selected_geoid
+    map_center, map_zoom = {"lat": center.y.mean(), "lon": center.x.mean()}, 10
+    if is_selected.any():
+        selected = blocks_4326[is_selected]
+        fig.add_trace(go.Choroplethmap(
+            geojson=selected[["GEOID", "geometry"]].__geo_interface__,
+            featureidkey="properties.GEOID",
+            locations=selected["GEOID"],
+            z=[0],
+            colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+            showscale=False,
+            hoverinfo="skip",
+            marker=dict(line=dict(width=3, color=basemap["outline"])),
+        ))
+        selected_center = center[is_selected.to_numpy()].iloc[0]
+        map_center = {"lat": selected_center.y, "lon": selected_center.x}
+        map_zoom = block_zoom(tuple(selected.total_bounds))
     fig.update_layout(
         map=dict(style=basemap["style"], layers=basemap.get("layers", []),
-                 center={"lat": center.y.mean(), "lon": center.x.mean()}, zoom=10),
+                 center=map_center, zoom=map_zoom),
         height=600, margin=dict(l=0, r=0, t=10, b=0), showlegend=False,
         font=dict(family="Arial, sans-serif", color="#172b3a"), paper_bgcolor="white",
     )
     map_col, legend_col = st.columns([4, 1.2])
-    map_col.plotly_chart(fig, key=f"left_behind_map_{cfg['prefix']}")
+    map_col.plotly_chart(fig, key=f"left_behind_map_{cfg['prefix']}_{selected_geoid}")
     legend_col.markdown(_bivariate_legend_html(), unsafe_allow_html=True)
+    if is_selected.any():
+        selected_class = _bivariate_label(blocks.loc[is_selected.to_numpy(), "bivariate_class"].iloc[0])
+        st.caption(f"Outlined: block {selected_geoid} from the Access map. {selected_class}.")
+    elif selected_geoid:
+        st.caption(f"Block {selected_geoid} from the Access map has no residents, so it is not on this map.")
     st.caption("High density: the most crowded blocks, home to a third of residents. "
                "Empty blocks are hidden. Each city is classified on its own.")
 
