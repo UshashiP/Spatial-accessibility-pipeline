@@ -123,8 +123,8 @@ class TestRunTransform:
         assert str(result.crs) == str(population_gdf.crs)
 
 
-def test_enhanced_weights_default_matches_equal_weighting():
-    """weights=(1, 1, 1, 1) must reproduce the published equal weighting exactly."""
+def test_enhanced_demand_weights_default_matches_equal_weighting():
+    """Listing the four columns at 1 must reproduce the published equal weighting exactly."""
     import geopandas as gpd
     import numpy as np
     from shapely.geometry import Point
@@ -137,8 +137,36 @@ def test_enhanced_weights_default_matches_equal_weighting():
     )
     facilities = gpd.GeoDataFrame({"supply": [10.0]}, geometry=[Point(100, 0)], crs="EPSG:32618")
     default = compute_enhanced_2sfca(blocks, facilities, d0=900, pop_col="population")
-    explicit = compute_enhanced_2sfca(blocks, facilities, d0=900, pop_col="population", weights=(1, 1, 1, 1))
-    no_income = compute_enhanced_2sfca(blocks, facilities, d0=900, pop_col="population", weights=(1, 0, 1, 1))
-    np.testing.assert_allclose(default["accessibility_score"], explicit["accessibility_score"])
+    equal = {"population": 1, "PerCapitaI": 1, "HI_block": 1, "age_18to65": 1}
+    explicit = compute_enhanced_2sfca(blocks, facilities, d0=900, pop_col="population", demand_weights=equal)
+    no_income = compute_enhanced_2sfca(blocks, facilities, d0=900, pop_col="population",
+                                       demand_weights={**equal, "PerCapitaI": 0})
+    np.testing.assert_array_equal(default["accessibility_score"], explicit["accessibility_score"])
     assert not np.allclose(default["accessibility_score"], no_income["accessibility_score"])
     assert default["accessibility_score"].iloc[3] == 0  # beyond the catchment
+
+
+def test_enhanced_transform_uses_configured_demand_columns():
+    """A study can name its own demand columns; a missing one stops the run."""
+    import geopandas as gpd
+    import numpy as np
+    import pytest
+    from shapely.geometry import Point
+    from pipeline.transform.sfca_enhanced import run_enhanced_transform
+
+    blocks = gpd.GeoDataFrame(
+        {"population": [100, 50, 80], "over_65": [40.0, 5.0, 20.0], "PerCapitaI": [1.0, 2.0, 3.0],
+         "HI_block": [3.0, 2.0, 1.0], "age_18to65": [10.0, 30.0, 20.0]},
+        geometry=[Point(0, 0), Point(300, 0), Point(600, 0)], crs="EPSG:32618",
+    )
+    facilities = gpd.GeoDataFrame({"supply": [10.0]}, geometry=[Point(100, 0)], crs="EPSG:32618")
+    config = {"analysis": {"distance_threshold_m": 900}}
+    published = run_enhanced_transform(blocks, facilities, config)
+    custom_config = {"analysis": {"distance_threshold_m": 900,
+                                  "demand_weights": {"population": 1, "over_65": 1}}}
+    custom = run_enhanced_transform(blocks, facilities, custom_config)
+    assert not np.allclose(published["accessibility_score"], custom["accessibility_score"])
+
+    custom_config["analysis"]["demand_weights"]["no_vehicle"] = 1
+    with pytest.raises(ValueError, match="no_vehicle"):
+        run_enhanced_transform(blocks, facilities, custom_config)

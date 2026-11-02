@@ -39,6 +39,13 @@ analysis:
   decay_function: "gaussian"
   population_column: "population"
   method_label: "SDW-2SFCA"
+  # Block columns summed into demand, each min-max normalised, with their
+  # coefficients. A new destination type lists its own columns here.
+  demand_weights:
+    population: 1
+    PerCapitaI: 1      # per capita income
+    HI_block: 1        # insured residents
+    age_18to65: 1      # working-age residents
 
 s3:
   prefix: "healthcare-accessibility"

@@ -71,7 +71,7 @@ python run_pipeline.py --config case_studies/nyc.yaml
 python run_pipeline.py --config case_studies/la_fqhc.yaml
 ```
 
-All parameters (CRS, bbox, catchment radius, decay function, facility type) are defined in the YAML config. See [`case_studies/README.md`](case_studies/README.md) for configuration details.
+All parameters (CRS, bbox, catchment radius, decay function, facility type, demand columns) are defined in the YAML config. See [`case_studies/README.md`](case_studies/README.md) for configuration details.
 
 ## The Method: SDW-2SFCA
 
