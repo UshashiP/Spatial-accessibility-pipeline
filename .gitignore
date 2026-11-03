@@ -51,3 +51,5 @@ notebooks/gap_statistics_clustering.ipynb
 scripts/visualization/Accessibility_API_Python.py
 scripts/comparison_analysis/regression_adv_final.py
 scripts/comparison_analysis/method_comparison.py
+scripts/comparison_analysis/weight_sensitivity.py
+scripts/comparison_analysis/catchment_sensitivity.py

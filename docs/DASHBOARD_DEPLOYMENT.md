@@ -7,7 +7,7 @@ This dashboard runs locally by default, but it can be deployed publicly.
 Install dashboard dependencies into the Python environment used to run Streamlit:
 
 ```bash
-python -m pip install -r requirements-dashboard.txt
+python -m pip install -r dashboard/requirements.txt
 ```
 
 ```bash

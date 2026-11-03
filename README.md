@@ -51,7 +51,7 @@ Together, they span different care models, geographies, and catchment patterns, 
 
 ### Findings
 
-All statistics count census blocks with residents only (blocks with no residents keep a population of 0 and are left out). The catchment radii differ by design, and the Gini depends strongly on the radius, so the cities are not ranked against each other; `scripts/comparison_analysis/catchment_sensitivity.py` reports each study at 900, 1,200 and 1,600 m.
+All statistics count census blocks with residents only (blocks with no residents keep a population of 0 and are left out). The catchment radii differ by design, and the Gini depends strongly on the radius, so the cities are not ranked against each other.
 
 **People are left behind in two ways.** *Isolated* blocks have no facility within the catchment; any catchment-based method finds the same ones. *Diluted* blocks have a facility nearby whose supply is stretched by demand; only a method that models competition for supply can see them. "Left behind" is the densest third of blocks (by residents) in either group; diluted means access in the lower half of blocks with any (population-weighted).
 
@@ -79,7 +79,7 @@ The **Socio-demographically Weighted 2SFCA (SDW-2SFCA)** framework extends the t
 
 ### Why It Matters
 
-On identical inputs for DC (same blocks, facilities, 900 m catchment and decay), each step up the method ladder changes what you see: cumulative opportunity gives a Gini of 0.57, gravity 0.63, E2SFCA (competition for supply) 0.71, and SDW-2SFCA (socio-demographic demand weighting) 0.80. Hansen, with no cutoff, gives every block some access and hides the gap entirely (0.41, no zero-access blocks). Methods without competition also miss diluted blocks: a gravity model misses about 24,000 DC residents that SDW-2SFCA flags as left behind. Reproduce with `python scripts/comparison_analysis/method_comparison.py`.
+On identical inputs for DC (same blocks, facilities, 900 m catchment and decay), each step up the method ladder changes what you see: cumulative opportunity gives a Gini of 0.57, gravity 0.63, E2SFCA (competition for supply) 0.71, and SDW-2SFCA (socio-demographic demand weighting) 0.80. Hansen, with no cutoff, gives every block some access and hides the gap entirely (0.41, no zero-access blocks). Methods without competition also miss diluted blocks: a gravity model misses about 24,000 DC residents that SDW-2SFCA flags as left behind.
 
 ### Implementation
 
@@ -262,8 +262,7 @@ Then navigate to **http://localhost:8501** in your browser.
 ### About the Dashboard
 
 The dashboard ([dashboard/app.py](dashboard/app.py)) is branded **CareScape — Healthcare
-Access Intelligence**. The earlier version, [dashboard/app_modern.py](dashboard/app_modern.py),
-is kept for reference. Both read the same pre-computed results.
+Access Intelligence**. It reads the pre-computed results.
 
 The overview leads with the number of residents living in zero-access blocks, followed by the
 share of blocks with no access, facility count, and Gini index, plus a one-sentence key finding.
@@ -580,7 +579,6 @@ This pipeline is a research tool and decision-support system, not ground truth. 
 │   ├── transform/                 # SDW-2SFCA computation
 │   │   └── sfca_2.py              # Standard 2SFCA (comparison baseline)
 │   ├── store/                     # Medallion storage (Bronze/Silver/Gold)
-│   │   ├── local_store.py
 │   │   └── s3_store.py
 │   ├── config.py                  # YAML config loader
 │   ├── duckdb_query.py            # Analytics layer (Gini, aggregations)
@@ -593,9 +591,8 @@ This pipeline is a research tool and decision-support system, not ground truth. 
 │   └── README.md                  # Config field documentation
 │
 ├── dashboard/                     # Interactive Streamlit dashboard
-│   ├── app.py                     # **CareScape dashboard** (current)
-│   ├── map_details.py             # Block proximity details and map color scale
-│   └── app_modern.py              # Previous dashboard version
+│   ├── app.py                     # **CareScape dashboard**
+│   └── map_details.py             # Block proximity details and map color scale
 │
 ├── dags/                          # Airflow orchestration
 │   └── accessibility_pipeline_dag.py
