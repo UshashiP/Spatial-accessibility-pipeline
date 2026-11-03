@@ -44,3 +44,10 @@ pipeline/transform/sfca_enhanced.py
 scripts/accessibility_methods/advanved2SFCA_block*.py
 NOTES.md
 PROJECT_SUMMARY.md
+notebooks/accessibility_api_python.ipynb
+notebooks/accessibility_webmap.ipynb
+notebooks/clustering_access.ipynb
+notebooks/gap_statistics_clustering.ipynb
+scripts/visualization/Accessibility_API_Python.py
+scripts/comparison_analysis/regression_adv_final.py
+scripts/comparison_analysis/method_comparison.py

@@ -75,10 +75,14 @@ def main(config_path: str | None = None) -> None:
 
     # ── 3. Transform (2SFCA) ──────────────────────────────────────────────
     log.info("--- Stage 3: Transform (Silver → Gold) ---")
-    from pipeline.transform.sfca_enhanced import run_enhanced_transform
+    try:
+        from pipeline.transform.sfca_enhanced import run_enhanced_transform as transform
+    except ImportError:
+        log.info("Enhanced transform not installed — using standard 2SFCA")
+        from pipeline.transform.sfca_2 import run_transform as transform
     from pipeline.store.s3_store import write_gold_scores
 
-    result_gdf = run_enhanced_transform(population_gdf, facility_gdf, config)
+    result_gdf = transform(population_gdf, facility_gdf, config)
     n_zero = (result_gdf["accessibility_score"] == 0).sum()
     log.info(
         "2SFCA complete — mean: %.6f | zero-access blocks: %d (%.1f%%)",
