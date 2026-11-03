@@ -75,11 +75,7 @@ All parameters (CRS, bbox, catchment radius, decay function, facility type, dema
 
 ## The Method: SDW-2SFCA
 
-The **Socio-demographically Weighted 2SFCA (SDW-2SFCA)** framework extends the traditional Two-Step Floating Catchment Area method with two critical refinements:
-
-1. **Socio-demographic demand weighting**: Effective demand at each census block is adjusted by income, health insurance coverage, and working-age population fraction. Low-income, uninsured, and vulnerable populations impose higher effective demand, so accessibility scores reflect need, not just headcount.
-
-2. **Truncated Gaussian distance decay**: Unlike standard exponential decay that approaches zero asymptotically, the truncated Gaussian reaches exactly zero at the catchment boundary, producing cleaner, more interpretable results and eliminating spurious long-distance effects.
+The **Socio-demographically Weighted 2SFCA (SDW-2SFCA)** framework extends the traditional Two-Step Floating Catchment Area method so that accessibility scores reflect need, not just headcount.
 
 ### Why It Matters
 
@@ -582,7 +578,6 @@ This pipeline is a research tool and decision-support system, not ground truth. 
 │   ├── validate/                  # Data quality gates
 │   │   └── quality_gates.py
 │   ├── transform/                 # SDW-2SFCA computation
-│   │   ├── sfca_enhanced.py       # Main accessibility algorithm
 │   │   └── sfca_2.py              # Standard 2SFCA (comparison baseline)
 │   ├── store/                     # Medallion storage (Bronze/Silver/Gold)
 │   │   ├── local_store.py

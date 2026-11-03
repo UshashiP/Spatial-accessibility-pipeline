@@ -38,3 +38,9 @@ logs/
 # OS and editor files
 .DS_Store
 .vscode/
+
+archived_scripts/
+pipeline/transform/sfca_enhanced.py
+scripts/accessibility_methods/advanved2SFCA_block*.py
+NOTES.md
+PROJECT_SUMMARY.md

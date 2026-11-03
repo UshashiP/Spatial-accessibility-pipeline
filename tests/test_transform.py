@@ -128,6 +128,8 @@ def test_enhanced_demand_weights_default_matches_equal_weighting():
     import geopandas as gpd
     import numpy as np
     from shapely.geometry import Point
+    import pytest
+    pytest.importorskip("pipeline.transform.sfca_enhanced")
     from pipeline.transform.sfca_enhanced import compute_enhanced_2sfca
 
     blocks = gpd.GeoDataFrame(
@@ -152,6 +154,8 @@ def test_enhanced_transform_uses_configured_demand_columns():
     import numpy as np
     import pytest
     from shapely.geometry import Point
+    import pytest
+    pytest.importorskip("pipeline.transform.sfca_enhanced")
     from pipeline.transform.sfca_enhanced import run_enhanced_transform
 
     blocks = gpd.GeoDataFrame(
